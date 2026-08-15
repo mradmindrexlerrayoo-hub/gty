@@ -1,17 +1,271 @@
-```json
-{
-  "name": "money-request-api",
-  "version": "1.0.0",
-  "private": true,
-  "main": "server.js",
-  "scripts": {
-    "start": "node server.js"
-  },
-  "dependencies": {
-    "cors": "^2.8.5",
-    "dotenv": "^16.4.7",
-    "express": "^4.21.2",
-    "intasend-node": "^1.2.4"
+```javascript
+require("dotenv").config();
+
+const express = require("express");
+const cors = require("cors");
+const crypto = require("crypto");
+const IntaSend = require("intasend-node");
+
+const app = express();
+
+app.use(express.json());
+
+app.use(
+  cors({
+    origin: process.env.FRONTEND_URL
+  })
+);
+
+const PORT = process.env.PORT || 3000;
+
+/*
+  FALSE = LIVE
+  TRUE  = SANDBOX
+
+  Start with TRUE while testing.
+  Change to FALSE only after your IntaSend
+  live account is approved.
+*/
+
+const SANDBOX = true;
+
+const intasend = new IntaSend(
+  process.env.INTASEND_PUBLISHABLE_KEY,
+  process.env.INTASEND_SECRET_KEY,
+  SANDBOX
+);
+
+const collection = intasend.collection();
+
+
+function normalizePhone(phone) {
+  const value = String(phone)
+    .trim()
+    .replace(/\s/g, "");
+
+  if (/^07\d{8}$/.test(value)) {
+    return "254" + value.substring(1);
   }
+
+  if (/^\+2547\d{8}$/.test(value)) {
+    return value.substring(1);
+  }
+
+  if (/^2547\d{8}$/.test(value)) {
+    return value;
+  }
+
+  throw new Error("Invalid Kenyan mobile number.");
 }
+
+
+function validateAmount(amount) {
+  const value = Number(amount);
+
+  if (
+    !Number.isInteger(value) ||
+    value < 10 ||
+    value > 150000
+  ) {
+    throw new Error(
+      "Amount must be between KSh 10 and KSh 150,000."
+    );
+  }
+
+  return value;
+}
+
+
+app.get("/health", (req, res) => {
+  res.json({
+    online: true
+  });
+});
+
+
+app.post("/api/payment", async (req, res) => {
+
+  try {
+
+    const {
+      firstName,
+      lastName,
+      phone,
+      amount,
+      reason
+    } = req.body;
+
+
+    if (!firstName || !phone || !amount) {
+
+      return res.status(400).json({
+        success: false,
+        error:
+          "First name, phone number and amount are required."
+      });
+
+    }
+
+
+    const cleanPhone =
+      normalizePhone(phone);
+
+    const cleanAmount =
+      validateAmount(amount);
+
+
+    const reference =
+      `REQUEST-${crypto.randomUUID()}`;
+
+
+    /*
+      Create the real M-Pesa STK Push.
+    */
+
+    const payment =
+      await collection.mpesaStkPush({
+
+        first_name:
+          firstName.trim(),
+
+        last_name:
+          (lastName || "Customer").trim(),
+
+        email:
+          `${reference.toLowerCase()}@example.com`,
+
+        host:
+          process.env.FRONTEND_URL,
+
+        amount:
+          cleanAmount,
+
+        phone_number:
+          cleanPhone,
+
+        api_ref:
+          reference
+
+      });
+
+
+    console.log(
+      "Payment created:",
+      reference
+    );
+
+
+    res.json({
+
+      success: true,
+
+      reference,
+
+      message:
+        "M-Pesa payment request created.",
+
+      payment
+
+    });
+
+
+  } catch (error) {
+
+    console.error(
+      "Payment error:",
+      error?.response?.data ||
+      error?.message ||
+      error
+    );
+
+
+    res.status(400).json({
+
+      success: false,
+
+      error:
+        error.message ||
+        "Unable to start payment."
+
+    });
+
+  }
+
+});
+
+
+/*
+  IntaSend webhook.
+
+  Configure this endpoint in your IntaSend dashboard:
+
+  https://YOUR-BACKEND-DOMAIN/api/webhook
+*/
+
+app.post("/api/webhook", (req, res) => {
+
+  console.log(
+    "INTASEND WEBHOOK:",
+    JSON.stringify(req.body, null, 2)
+  );
+
+
+  const event = req.body;
+
+
+  /*
+    IMPORTANT:
+
+    Do NOT trust the browser to tell you
+    that payment succeeded.
+
+    Your production application should
+    verify the webhook according to
+    IntaSend's webhook documentation
+    before updating your database.
+  */
+
+  if (event.state === "COMPLETE") {
+
+    console.log(
+      "PAYMENT CONFIRMED:",
+      event.api_ref
+    );
+
+    /*
+      Save the transaction in your database.
+
+      Example:
+
+      reference: event.api_ref
+      status: "PAID"
+      amount: event.value
+    */
+  }
+
+
+  if (event.state === "FAILED") {
+
+    console.log(
+      "PAYMENT FAILED:",
+      event.api_ref
+    );
+
+  }
+
+
+  res.status(200).json({
+    received: true
+  });
+
+});
+
+
+app.listen(PORT, () => {
+
+  console.log(
+    `Payment server running on port ${PORT}`
+  );
+
+});
 ```
