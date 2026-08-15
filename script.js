@@ -1,114 +1,147 @@
-const API_URL = "https://gty-5vwh.onrender.com";
+const API_URL = "https://gty-5vwn.onrender.com";
 
-const form = document.getElementById("paymentForm");
-const status = document.getElementById("status");
-const payButton = document.querySelector(".pay-button");
-const amountInput = document.getElementById("amount");
+document.addEventListener("DOMContentLoaded", () => {
+    const form = document.getElementById("paymentForm");
+    const payButton = document.getElementById("payButton");
+    const status = document.getElementById("status");
 
-// Quick amount buttons
-document.querySelectorAll(".amounts button").forEach((button) => {
-  button.addEventListener("click", () => {
-    amountInput.value = button.dataset.amount;
-  });
-});
+    const firstNameInput = document.getElementById("firstName");
+    const phoneInput = document.getElementById("phone");
+    const amountInput = document.getElementById("amount");
+    const reasonInput = document.getElementById("reason");
 
-// Payment form
-form.addEventListener("submit", async (event) => {
-  event.preventDefault();
+    // Amount buttons
+    const amountButtons = document.querySelectorAll("[data-amount]");
 
-  const firstName = document
-    .getElementById("firstName")
-    .value
-    .trim();
+    amountButtons.forEach((button) => {
+        button.addEventListener("click", () => {
+            const amount = button.dataset.amount;
 
-  const phone = document
-    .getElementById("phone")
-    .value
-    .trim();
+            if (amountInput) {
+                amountInput.value = amount;
+            }
 
-  const amount = Number(amountInput.value);
+            amountButtons.forEach((btn) => {
+                btn.classList.remove("selected");
+            });
 
-  const reason = document
-    .getElementById("reason")
-    .value
-    .trim();
+            button.classList.add("selected");
+        });
+    });
 
-  // Validate Kenyan phone number
-  if (!/^07\d{8}$/.test(phone)) {
-    status.textContent =
-      "Please enter a valid Kenyan M-Pesa number, for example 0712345678.";
-    return;
-  }
-
-  // Validate amount
-  if (
-    !Number.isInteger(amount) ||
-    amount < 10 ||
-    amount > 150000
-  ) {
-    status.textContent =
-      "Please enter an amount between KSh 10 and KSh 150,000.";
-    return;
-  }
-
-  if (!reason) {
-    status.textContent =
-      "Please enter the reason for the payment.";
-    return;
-  }
-
-  payButton.disabled = true;
-
-  status.textContent =
-    "Starting M-Pesa payment... Please wait.";
-
-  try {
-    const response = await fetch(
-      `${API_URL}/api/payment`,
-      {
-        method: "POST",
-
-        headers: {
-          "Content-Type": "application/json"
-        },
-
-        body: JSON.stringify({
-          firstName: firstName,
-          phone: phone,
-          amount: amount,
-          reason: reason
-        })
-      }
-    );
-
-    const data = await response.json();
-
-    if (!response.ok || !data.success) {
-      throw new Error(
-        data.error ||
-        "The payment request could not be started."
-      );
+    if (!form || !payButton) {
+        console.error("Payment form or payment button was not found.");
+        return;
     }
 
-    status.innerHTML = `
-      <strong>M-Pesa request sent.</strong><br><br>
-      Check your phone for the M-Pesa prompt.
-      Confirm that the amount is correct before
-      entering your M-Pesa PIN.
-    `;
+    form.addEventListener("submit", async (event) => {
+        event.preventDefault();
 
-    console.log(
-      "Payment reference:",
-      data.reference
-    );
+        const firstName = firstNameInput?.value.trim() || "";
+        const phone = phoneInput?.value.trim() || "";
+        const amount = amountInput?.value.trim() || "";
+        const reason = reasonInput?.value.trim() || "";
 
-  } catch (error) {
-    console.error("Payment error:", error);
+        if (!firstName) {
+            showStatus("Please enter your name.", true);
+            return;
+        }
 
-    status.textContent =
-      error.message ||
-      "Something went wrong while starting the payment.";
-  } finally {
-    payButton.disabled = false;
-  }
+        if (!phone) {
+            showStatus("Please enter the friend's M-Pesa number.", true);
+            return;
+        }
+
+        if (!/^07\d{8}$/.test(phone)) {
+            showStatus(
+                "Please enter a valid Kenyan M-Pesa number, for example 0712345678.",
+                true
+            );
+            return;
+        }
+
+        const numericAmount = Number(amount);
+
+        if (!numericAmount || numericAmount <= 0) {
+            showStatus("Please enter a valid amount.", true);
+            return;
+        }
+
+        if (!reason) {
+            showStatus("Please enter the reason for the payment request.", true);
+            return;
+        }
+
+        payButton.disabled = true;
+
+        showStatus("Starting M-Pesa payment... Please wait.", false);
+
+        try {
+            const response = await fetch(`${API_URL}/api/payment`, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({
+                    firstName: firstName,
+                    phone: phone,
+                    amount: numericAmount,
+                    reason: reason
+                })
+            });
+
+            let data = {};
+
+            try {
+                data = await response.json();
+            } catch {
+                data = {};
+            }
+
+            if (!response.ok) {
+                throw new Error(
+                    data.message ||
+                    data.error ||
+                    `Payment request failed (${response.status})`
+                );
+            }
+
+            if (data.success === false) {
+                throw new Error(
+                    data.message ||
+                    data.error ||
+                    "The payment request could not be created."
+                );
+            }
+
+            showStatus(
+                data.message ||
+                "Payment request created. Check the M-Pesa phone for the payment prompt.",
+                false
+            );
+
+        } catch (error) {
+            console.error("Payment error:", error);
+
+            showStatus(
+                error.message ||
+                "Failed to connect to the payment server. Please try again.",
+                true
+            );
+        } finally {
+            payButton.disabled = false;
+        }
+    });
+
+    function showStatus(message, isError) {
+        if (!status) return;
+
+        status.textContent = message;
+
+        if (isError) {
+            status.classList.add("error");
+        } else {
+            status.classList.remove("error");
+        }
+    }
 });
