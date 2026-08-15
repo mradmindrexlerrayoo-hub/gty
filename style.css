@@ -1,0 +1,228 @@
+```css
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: Arial, sans-serif;
+  background: #f3f6f4;
+  color: #17201b;
+}
+
+.container {
+  min-height: 100vh;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  padding: 20px;
+}
+
+.card {
+  width: 100%;
+  max-width: 500px;
+
+  background: white;
+
+  padding: 30px;
+
+  border-radius: 20px;
+
+  box-shadow:
+    0 15px 40px
+    rgba(0, 0, 0, 0.08);
+}
+
+.icon {
+  width: 65px;
+  height: 65px;
+
+  margin: auto;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  background: #e8f6ed;
+
+  border-radius: 50%;
+
+  font-size: 30px;
+}
+
+h1 {
+  text-align: center;
+  margin: 15px 0 5px;
+}
+
+.subtitle {
+  text-align: center;
+  color: #6d766f;
+  margin-bottom: 25px;
+}
+
+label {
+  display: block;
+
+  margin:
+    16px 0 7px;
+
+  font-weight: bold;
+}
+
+input,
+textarea {
+  width: 100%;
+
+  padding: 14px;
+
+  border:
+    1px solid
+    #d5ddd8;
+
+  border-radius: 10px;
+
+  font-size: 16px;
+
+  outline: none;
+}
+
+input:focus,
+textarea:focus {
+  border-color: #168b43;
+}
+
+textarea {
+  min-height: 100px;
+  resize: vertical;
+}
+
+.amounts {
+  display: grid;
+
+  grid-template-columns:
+    repeat(3, 1fr);
+
+  gap: 8px;
+
+  margin-bottom: 10px;
+}
+
+.amounts button {
+  padding: 11px;
+
+  border:
+    1px solid
+    #d5ddd8;
+
+  background: #f3f6f4;
+
+  border-radius: 9px;
+
+  cursor: pointer;
+
+  font-weight: bold;
+}
+
+.amounts button:hover {
+  background: #e3eee6;
+}
+
+.pay-button {
+  width: 100%;
+
+  margin-top: 22px;
+
+  padding: 15px;
+
+  border: 0;
+
+  border-radius: 10px;
+
+  background: #168b43;
+
+  color: white;
+
+  font-size: 16px;
+
+  font-weight: bold;
+
+  cursor: pointer;
+}
+
+.pay-button:hover {
+  background: #106c32;
+}
+
+.pay-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.recipient {
+  display: flex;
+
+  justify-content: space-between;
+
+  margin-top: 20px;
+
+  padding: 15px;
+
+  border-radius: 10px;
+
+  background: #f4f7f5;
+}
+
+.recipient span {
+  color: #727b75;
+}
+
+.status {
+  margin-top: 20px;
+
+  padding: 14px;
+
+  border-radius: 10px;
+
+  line-height: 1.5;
+}
+
+.notice {
+  margin-top: 15px;
+
+  padding: 13px;
+
+  background: #fff8e6;
+
+  border-radius: 10px;
+
+  font-size: 13px;
+
+  line-height: 1.5;
+}
+
+footer {
+  margin-top: 25px;
+
+  text-align: center;
+
+  color: #89918b;
+
+  font-size: 11px;
+}
+
+@media (max-width: 400px) {
+
+  .card {
+    padding: 20px;
+  }
+
+  .amounts {
+    grid-template-columns:
+      repeat(2, 1fr);
+  }
+
+}
+```
