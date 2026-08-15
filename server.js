@@ -3,17 +3,9 @@ const cors = require("cors");
 
 const app = express();
 
-// =====================================================
-// SETTINGS
-// =====================================================
-
 const PORT = process.env.PORT || 10000;
-
-// IntaSend API
 const INTASEND_SECRET_KEY = process.env.INTASEND_SECRET_KEY;
 
-// Set INTASEND_LIVE=true on Render for live payments.
-// Leave it false for sandbox/testing.
 const INTASEND_LIVE =
     String(process.env.INTASEND_LIVE).toLowerCase() === "true";
 
@@ -25,19 +17,7 @@ const INTASEND_API_URL = INTASEND_LIVE
 // MIDDLEWARE
 // =====================================================
 
-// Allow your website to communicate with this backend.
-app.use(
-    cors({
-        origin: true,
-        methods: ["GET", "POST", "OPTIONS"],
-        allowedHeaders: [
-            "Content-Type",
-            "Accept",
-            "Authorization"
-        ]
-    })
-);
-
+app.use(cors());
 app.use(express.json());
 
 // =====================================================
@@ -52,14 +32,14 @@ app.get("/", (req, res) => {
 });
 
 // =====================================================
-// PAYMENT ENDPOINT
+// PAYMENT
 // =====================================================
 
 app.post("/api/payment", async (req, res) => {
     try {
-        console.log("----------------------------------------");
-        console.log("Payment request received");
-        console.log("----------------------------------------");
+        console.log("================================");
+        console.log("PAYMENT REQUEST RECEIVED");
+        console.log("================================");
 
         const {
             firstName,
@@ -68,49 +48,38 @@ app.post("/api/payment", async (req, res) => {
             reason
         } = req.body;
 
-        // -------------------------------------------------
-        // CHECK INTASEND KEY
-        // -------------------------------------------------
+        // ---------------------------------------------
+        // CHECK SECRET KEY
+        // ---------------------------------------------
 
         if (!INTASEND_SECRET_KEY) {
-            console.error(
-                "INTASEND_SECRET_KEY is missing."
-            );
+            console.error("INTASEND_SECRET_KEY is missing.");
 
             return res.status(500).json({
                 success: false,
                 message:
-                    "Payment server is not configured. Add INTASEND_SECRET_KEY to Render environment variables."
+                    "Payment service is not configured on the server."
             });
         }
 
-        // -------------------------------------------------
-        // VALIDATE NAME
-        // -------------------------------------------------
+        // ---------------------------------------------
+        // NAME
+        // ---------------------------------------------
 
         if (
             !firstName ||
-            typeof firstName !== "string"
+            typeof firstName !== "string" ||
+            !firstName.trim()
         ) {
             return res.status(400).json({
                 success: false,
-                message: "Please provide your name."
+                message: "Please enter your name."
             });
         }
 
-        const cleanFirstName =
-            firstName.trim();
-
-        if (!cleanFirstName) {
-            return res.status(400).json({
-                success: false,
-                message: "Please provide your name."
-            });
-        }
-
-        // -------------------------------------------------
-        // VALIDATE PHONE
-        // -------------------------------------------------
+        // ---------------------------------------------
+        // PHONE
+        // ---------------------------------------------
 
         if (
             !phone ||
@@ -119,21 +88,15 @@ app.post("/api/payment", async (req, res) => {
             return res.status(400).json({
                 success: false,
                 message:
-                    "Please provide the M-Pesa phone number."
+                    "Please enter the M-Pesa phone number."
             });
         }
 
         let cleanPhone =
             phone.trim().replace(/\s+/g, "");
 
-        // Accept:
-        // 0712345678
-        // 254712345678
-        // +254712345678
-
         if (cleanPhone.startsWith("+254")) {
-            cleanPhone =
-                cleanPhone.substring(1);
+            cleanPhone = cleanPhone.substring(1);
         }
 
         if (cleanPhone.startsWith("07")) {
@@ -149,12 +112,11 @@ app.post("/api/payment", async (req, res) => {
             });
         }
 
-        // -------------------------------------------------
-        // VALIDATE AMOUNT
-        // -------------------------------------------------
+        // ---------------------------------------------
+        // AMOUNT
+        // ---------------------------------------------
 
-        const numericAmount =
-            Number(amount);
+        const numericAmount = Number(amount);
 
         if (
             !Number.isFinite(numericAmount) ||
@@ -175,92 +137,72 @@ app.post("/api/payment", async (req, res) => {
             });
         }
 
-        // -------------------------------------------------
-        // VALIDATE REASON
-        // -------------------------------------------------
+        // ---------------------------------------------
+        // REASON
+        // ---------------------------------------------
 
         if (
             !reason ||
-            typeof reason !== "string"
+            typeof reason !== "string" ||
+            !reason.trim()
         ) {
             return res.status(400).json({
                 success: false,
                 message:
-                    "Please provide the reason for the payment."
+                    "Please enter the reason."
             });
         }
 
-        const cleanReason =
-            reason.trim();
-
-        if (!cleanReason) {
-            return res.status(400).json({
-                success: false,
-                message:
-                    "Please provide the reason for the payment."
-            });
-        }
-
-        // -------------------------------------------------
-        // CREATE PAYMENT REFERENCE
-        // -------------------------------------------------
+        // ---------------------------------------------
+        // PAYMENT REFERENCE
+        // ---------------------------------------------
 
         const apiRef =
-            `ASKFRIEND-${Date.now()}`;
+            "ASKFRIEND-" + Date.now();
 
-        console.log("Name:", cleanFirstName);
+        console.log("Name:", firstName.trim());
         console.log("Phone:", cleanPhone);
         console.log("Amount:", numericAmount);
-        console.log("Reason:", cleanReason);
+        console.log("Reason:", reason.trim());
         console.log("Reference:", apiRef);
         console.log(
-            "Environment:",
-            INTASEND_LIVE
-                ? "LIVE"
-                : "SANDBOX"
+            "Mode:",
+            INTASEND_LIVE ? "LIVE" : "SANDBOX"
         );
 
-        // -------------------------------------------------
+        // ---------------------------------------------
         // INTASEND STK PUSH
-        // -------------------------------------------------
+        // ---------------------------------------------
 
-        const intasendResponse =
-            await fetch(
-                INTASEND_API_URL +
-                    "/api/v1/payment/mpesa-stk-push/",
-                {
-                    method: "POST",
+        const intasendResponse = await fetch(
+            INTASEND_API_URL +
+                "/api/v1/payment/mpesa-stk-push/",
+            {
+                method: "POST",
 
-                    headers: {
-                        "Content-Type":
-                            "application/json",
+                headers: {
+                    "Authorization":
+                        `Bearer ${INTASEND_SECRET_KEY}`,
 
-                        "Accept":
-                            "application/json",
+                    "Content-Type":
+                        "application/json",
 
-                        "Authorization":
-                            `Bearer ${INTASEND_SECRET_KEY}`
-                    },
+                    "Accept":
+                        "application/json"
+                },
 
-                    body: JSON.stringify({
-                        amount:
-                            numericAmount,
+                body: JSON.stringify({
+                    amount: numericAmount,
+                    phone_number: cleanPhone,
+                    api_ref: apiRef,
+                    mobile_tarrif: "BUSINESS-PAYS"
+                })
+            }
+        );
 
-                        phone_number:
-                            cleanPhone,
-
-                        api_ref:
-                            apiRef,
-
-                        mobile_tarrif:
-                            "BUSINESS-PAYS"
-                    })
-                }
-            );
-
-        // -------------------------------------------------
-        // READ INTASEND RESPONSE
-        // -------------------------------------------------
+        // ---------------------------------------------
+        // READ RESPONSE
+        // ---------------------------------------------
 
         const responseText =
             await intasendResponse.text();
@@ -275,7 +217,7 @@ app.post("/api/payment", async (req, res) => {
             responseText
         );
 
-        let intasendData = {};
+        let intasendData;
 
         try {
             intasendData =
@@ -286,37 +228,29 @@ app.post("/api/payment", async (req, res) => {
             };
         }
 
-        // -------------------------------------------------
+        // ---------------------------------------------
         // INTASEND ERROR
-        // -------------------------------------------------
+        // ---------------------------------------------
 
         if (!intasendResponse.ok) {
-            console.error(
-                "IntaSend payment failed:",
-                intasendData
-            );
-
             return res.status(
                 intasendResponse.status
             ).json({
                 success: false,
-
                 message:
                     intasendData.message ||
                     intasendData.detail ||
                     intasendData.error ||
-                    "IntaSend rejected the payment request.",
-
-                intasend: intasendData
+                    "IntaSend rejected the payment request."
             });
         }
 
-        // -------------------------------------------------
+        // ---------------------------------------------
         // SUCCESS
-        // -------------------------------------------------
+        // ---------------------------------------------
 
         console.log(
-            "STK Push request accepted by IntaSend."
+            "IntaSend accepted the payment request."
         );
 
         return res.json({
@@ -325,25 +259,21 @@ app.post("/api/payment", async (req, res) => {
             message:
                 "Payment request sent. Check the M-Pesa phone for the payment prompt.",
 
-            reference: apiRef,
-
-            intasend: intasendData
+            reference: apiRef
         });
 
     } catch (error) {
         console.error(
-            "PAYMENT SERVER ERROR:"
+            "PAYMENT SERVER ERROR:",
+            error
         );
-
-        console.error(error);
 
         return res.status(500).json({
             success: false,
-
             message:
                 "Payment server error: " +
                 (error.message ||
-                    "Unknown error.")
+                    "Unknown error")
         });
     }
 });
@@ -372,11 +302,10 @@ app.listen(
         );
 
         console.log(
-            `IntaSend mode: ${
-                INTASEND_LIVE
-                    ? "LIVE"
-                    : "SANDBOX"
-            }`
+            "IntaSend mode:",
+            INTASEND_LIVE
+                ? "LIVE"
+                : "SANDBOX"
         );
     }
 );
