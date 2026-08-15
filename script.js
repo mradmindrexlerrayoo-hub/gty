@@ -3,6 +3,10 @@ const API_URL = "https://gty-5vwn.onrender.com";
 document.addEventListener("DOMContentLoaded", () => {
     console.log("Ask a Friend: JavaScript loaded");
 
+    // -----------------------------------------
+    // GET ELEMENTS
+    // -----------------------------------------
+
     const form = document.getElementById("paymentForm");
     const status = document.getElementById("status");
 
@@ -11,36 +15,88 @@ document.addEventListener("DOMContentLoaded", () => {
     const amountInput = document.getElementById("amount");
     const reasonInput = document.getElementById("reason");
 
-    // Find the payment button using either common ID/class
     const payButton =
         document.getElementById("payButton") ||
         document.querySelector(".pay-button") ||
-        document.querySelector('button[type="submit"]');
+        form?.querySelector('button[type="submit"]');
 
-    // Check that the page contains the expected elements
+    // -----------------------------------------
+    // CHECK PAGE
+    // -----------------------------------------
+
     if (!form) {
-        console.error("paymentForm was not found");
-        return;
-    }
-
-    if (!amountInput) {
-        console.error("amount input was not found");
+        console.error("ERROR: #paymentForm not found.");
         return;
     }
 
     if (!status) {
-        console.error("status element was not found");
+        console.warn("WARNING: #status not found.");
     }
 
-    // --------------------------------------------------
-    // QUICK AMOUNT BUTTONS
-    // --------------------------------------------------
+    if (!firstNameInput) {
+        console.warn("WARNING: #firstName not found.");
+    }
 
-    const amountButtons = document.querySelectorAll("[data-amount]");
+    if (!phoneInput) {
+        console.warn("WARNING: #phone not found.");
+    }
+
+    if (!amountInput) {
+        console.warn("WARNING: #amount not found.");
+    }
+
+    if (!reasonInput) {
+        console.warn("WARNING: #reason not found.");
+    }
+
+    // -----------------------------------------
+    // STATUS FUNCTION
+    // -----------------------------------------
+
+    function setStatus(message, type = "info") {
+        console.log("[STATUS]", message);
+
+        if (!status) {
+            return;
+        }
+
+        status.textContent = message;
+
+        status.classList.remove(
+            "error",
+            "success",
+            "loading"
+        );
+
+        if (type === "error") {
+            status.classList.add("error");
+        }
+
+        if (type === "success") {
+            status.classList.add("success");
+        }
+
+        if (type === "loading") {
+            status.classList.add("loading");
+        }
+    }
+
+    // -----------------------------------------
+    // QUICK AMOUNT BUTTONS
+    // -----------------------------------------
+
+    const amountButtons =
+        document.querySelectorAll("[data-amount]");
 
     amountButtons.forEach((button) => {
         button.addEventListener("click", () => {
-            const selectedAmount = button.getAttribute("data-amount");
+
+            const selectedAmount =
+                button.getAttribute("data-amount");
+
+            if (!amountInput) {
+                return;
+            }
 
             amountInput.value = selectedAmount;
 
@@ -51,192 +107,368 @@ document.addEventListener("DOMContentLoaded", () => {
             button.classList.add("selected");
 
             setStatus(
-                "Amount selected: KSh " + selectedAmount,
-                false
+                "Amount selected: KSh " +
+                Number(selectedAmount).toLocaleString(),
+                "success"
             );
         });
     });
 
-    // --------------------------------------------------
-    // PAYMENT FORM
-    // --------------------------------------------------
+    // -----------------------------------------
+    // FORM SUBMIT
+    // -----------------------------------------
 
     form.addEventListener("submit", async (event) => {
+
         event.preventDefault();
 
-        console.log("Payment form submitted");
+        console.log("--------------------------------");
+        console.log("PAYMENT FORM SUBMITTED");
+        console.log("--------------------------------");
 
-        const firstName = firstNameInput
-            ? firstNameInput.value.trim()
-            : "";
+        // -----------------------------------------
+        // READ VALUES
+        // -----------------------------------------
 
-        const phone = phoneInput
-            ? phoneInput.value.trim()
-            : "";
+        const firstName =
+            firstNameInput?.value.trim() || "";
 
-        const amount = amountInput
-            ? amountInput.value.trim()
-            : "";
+        const phone =
+            phoneInput?.value.trim() || "";
 
-        const reason = reasonInput
-            ? reasonInput.value.trim()
-            : "";
+        const amount =
+            amountInput?.value.trim() || "";
 
-        // Validate name
+        const reason =
+            reasonInput?.value.trim() || "";
+
+        console.log("Name:", firstName);
+        console.log("Phone:", phone);
+        console.log("Amount:", amount);
+        console.log("Reason:", reason);
+
+        // -----------------------------------------
+        // VALIDATE NAME
+        // -----------------------------------------
+
         if (!firstName) {
-            setStatus("Please enter your name.", true);
+            setStatus(
+                "Please enter your name.",
+                "error"
+            );
+            firstNameInput?.focus();
             return;
         }
 
-        // Validate phone
+        // -----------------------------------------
+        // VALIDATE PHONE
+        // -----------------------------------------
+
         if (!phone) {
             setStatus(
                 "Please enter the friend's M-Pesa number.",
-                true
+                "error"
             );
+            phoneInput?.focus();
             return;
         }
 
-        if (!/^07\d{8}$/.test(phone)) {
+        /*
+         * Accept:
+         * 0712345678
+         *
+         * Also accept:
+         * +254712345678
+         *
+         * The number is converted to 254 format
+         * before being sent to the backend.
+         */
+
+        let formattedPhone = phone.replace(/\s+/g, "");
+
+        if (formattedPhone.startsWith("07")) {
+
+            if (!/^07\d{8}$/.test(formattedPhone)) {
+                setStatus(
+                    "Enter a valid Kenyan number, e.g. 0712345678.",
+                    "error"
+                );
+                phoneInput?.focus();
+                return;
+            }
+
+            formattedPhone =
+                "254" + formattedPhone.substring(1);
+
+        } else if (formattedPhone.startsWith("+254")) {
+
+            formattedPhone =
+                formattedPhone.substring(1);
+
+            if (!/^2547\d{8}$/.test(formattedPhone)) {
+                setStatus(
+                    "Enter a valid Kenyan M-Pesa number.",
+                    "error"
+                );
+                phoneInput?.focus();
+                return;
+            }
+
+        } else if (formattedPhone.startsWith("254")) {
+
+            if (!/^2547\d{8}$/.test(formattedPhone)) {
+                setStatus(
+                    "Enter a valid Kenyan M-Pesa number.",
+                    "error"
+                );
+                phoneInput?.focus();
+                return;
+            }
+
+        } else {
+
             setStatus(
-                "Enter a valid Kenyan number, for example 0712345678.",
-                true
+                "Enter a valid Kenyan number, e.g. 0712345678.",
+                "error"
             );
+
+            phoneInput?.focus();
+
             return;
         }
 
-        // Validate amount
-        const numericAmount = Number(amount);
+        // -----------------------------------------
+        // VALIDATE AMOUNT
+        // -----------------------------------------
 
-        if (!numericAmount || numericAmount <= 0) {
+        const numericAmount =
+            Number(amount);
+
+        if (
+            !Number.isFinite(numericAmount) ||
+            numericAmount < 10
+        ) {
             setStatus(
-                "Please enter a valid amount.",
-                true
+                "Enter an amount of at least KSh 10.",
+                "error"
             );
+
+            amountInput?.focus();
+
             return;
         }
 
-        // Validate reason
+        if (numericAmount > 150000) {
+            setStatus(
+                "The maximum amount is KSh 150,000.",
+                "error"
+            );
+
+            amountInput?.focus();
+
+            return;
+        }
+
+        // -----------------------------------------
+        // VALIDATE REASON
+        // -----------------------------------------
+
         if (!reason) {
             setStatus(
                 "Please enter the reason.",
-                true
+                "error"
             );
+
+            reasonInput?.focus();
+
             return;
         }
 
-        // Disable button while processing
+        // -----------------------------------------
+        // DISABLE PAYMENT BUTTON
+        // -----------------------------------------
+
         if (payButton) {
             payButton.disabled = true;
         }
 
         setStatus(
-            "Connecting to the payment server...",
-            false
+            "Connecting to payment server...",
+            "loading"
         );
 
-        console.log("Sending payment request to:", API_URL);
+        // -----------------------------------------
+        // REQUEST DATA
+        // -----------------------------------------
+
+        const requestData = {
+            firstName: firstName,
+            phone: formattedPhone,
+            amount: numericAmount,
+            reason: reason
+        };
+
+        console.log(
+            "Backend URL:",
+            API_URL + "/api/payment"
+        );
+
+        console.log(
+            "Request data:",
+            requestData
+        );
+
+        // -----------------------------------------
+        // SEND REQUEST
+        // -----------------------------------------
 
         try {
+
             const response = await fetch(
                 API_URL + "/api/payment",
                 {
                     method: "POST",
 
                     headers: {
-                        "Content-Type": "application/json"
+                        "Content-Type": "application/json",
+                        "Accept": "application/json"
                     },
 
-                    body: JSON.stringify({
-                        firstName: firstName,
-                        phone: phone,
-                        amount: numericAmount,
-                        reason: reason
-                    })
+                    body: JSON.stringify(requestData)
                 }
             );
 
             console.log(
-                "Server response:",
+                "HTTP STATUS:",
                 response.status
             );
 
-            const responseText = await response.text();
+            const responseText =
+                await response.text();
 
             console.log(
-                "Server response body:",
+                "SERVER RESPONSE:",
                 responseText
             );
 
+            // -----------------------------------------
+            // PARSE RESPONSE
+            // -----------------------------------------
+
             let data = {};
 
-            try {
-                data = JSON.parse(responseText);
-            } catch (jsonError) {
-                data = {
-                    message: responseText
-                };
+            if (responseText) {
+
+                try {
+                    data =
+                        JSON.parse(responseText);
+
+                } catch (parseError) {
+
+                    data = {
+                        message: responseText
+                    };
+                }
             }
+
+            console.log(
+                "PARSED DATA:",
+                data
+            );
+
+            // -----------------------------------------
+            // SERVER ERROR
+            // -----------------------------------------
 
             if (!response.ok) {
+
                 throw new Error(
                     data.message ||
                     data.error ||
-                    "Server error: HTTP " + response.status
+                    "Server returned HTTP " +
+                    response.status
                 );
             }
 
-            if (data.success === false) {
+            // -----------------------------------------
+            // PAYMENT FAILED
+            // -----------------------------------------
+
+            if (
+                data.success === false ||
+                data.status === "failed"
+            ) {
+
                 throw new Error(
                     data.message ||
                     data.error ||
-                    "Payment request was not accepted."
+                    "The payment request was rejected."
                 );
             }
+
+            // -----------------------------------------
+            // SUCCESS
+            // -----------------------------------------
 
             setStatus(
                 data.message ||
-                "Payment request submitted successfully. Check the M-Pesa phone for the payment prompt.",
-                false
+                "Payment request sent successfully. Check the M-Pesa phone for the payment prompt.",
+                "success"
+            );
+
+            console.log(
+                "PAYMENT REQUEST SUCCESSFUL"
             );
 
         } catch (error) {
+
             console.error(
-                "Payment error:",
+                "PAYMENT ERROR:",
                 error
             );
 
+            let errorMessage =
+                error?.message ||
+                "Unknown error";
+
+            // -----------------------------------------
+            // FAILED TO FETCH
+            // -----------------------------------------
+
+            if (
+                errorMessage === "Failed to fetch" ||
+                errorMessage.includes("NetworkError")
+            ) {
+
+                errorMessage =
+                    "The website cannot connect to the Render backend. Check that your backend is running and that CORS allows this website.";
+            }
+
+            // -----------------------------------------
+            // SHOW ERROR
+            // -----------------------------------------
+
             setStatus(
                 "Payment connection failed: " +
-                error.message,
-                true
+                errorMessage,
+                "error"
             );
 
         } finally {
+
             if (payButton) {
                 payButton.disabled = false;
             }
+
         }
     });
 
-    // --------------------------------------------------
-    // STATUS MESSAGE
-    // --------------------------------------------------
+    // -----------------------------------------
+    // PAGE READY
+    // -----------------------------------------
 
-    function setStatus(message, isError) {
-        if (!status) {
-            console.log(message);
-            return;
-        }
+    console.log(
+        "Ask a Friend: Ready"
+    );
 
-        status.textContent = message;
-
-        if (isError) {
-            status.classList.add("error");
-        } else {
-            status.classList.remove("error");
-        }
-    }
-
-    console.log("Ask a Friend: Ready");
 });
