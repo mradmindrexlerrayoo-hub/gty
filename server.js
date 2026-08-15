@@ -14,20 +14,36 @@ const INTASEND_API_URL = INTASEND_LIVE
     : "https://sandbox.intasend.com";
 
 // =====================================================
-// MIDDLEWARE
+// CORS + BODY PARSING
 // =====================================================
 
-app.use(cors());
+app.use(cors({
+    origin: true,
+    methods: ["GET", "POST", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Accept"]
+}));
+
 app.use(express.json());
 
 // =====================================================
-// HOME / HEALTH CHECK
+// HOME
 // =====================================================
 
 app.get("/", (req, res) => {
     res.json({
         success: true,
         message: "Ask a Friend payment server is online."
+    });
+});
+
+// =====================================================
+// API CONNECTION TEST
+// =====================================================
+
+app.get("/api/payment", (req, res) => {
+    res.json({
+        success: true,
+        message: "Payment API is reachable."
     });
 });
 
@@ -49,7 +65,7 @@ app.post("/api/payment", async (req, res) => {
         } = req.body;
 
         // ---------------------------------------------
-        // CHECK SECRET KEY
+        // CHECK INTASEND KEY
         // ---------------------------------------------
 
         if (!INTASEND_SECRET_KEY) {
@@ -165,6 +181,7 @@ app.post("/api/payment", async (req, res) => {
         console.log("Amount:", numericAmount);
         console.log("Reason:", reason.trim());
         console.log("Reference:", apiRef);
+
         console.log(
             "Mode:",
             INTASEND_LIVE ? "LIVE" : "SANDBOX"
@@ -201,7 +218,7 @@ app.post("/api/payment", async (req, res) => {
         );
 
         // ---------------------------------------------
-        // READ RESPONSE
+        // READ INTASEND RESPONSE
         // ---------------------------------------------
 
         const responseText =
@@ -237,6 +254,7 @@ app.post("/api/payment", async (req, res) => {
                 intasendResponse.status
             ).json({
                 success: false,
+
                 message:
                     intasendData.message ||
                     intasendData.detail ||
@@ -270,10 +288,13 @@ app.post("/api/payment", async (req, res) => {
 
         return res.status(500).json({
             success: false,
+
             message:
                 "Payment server error: " +
-                (error.message ||
-                    "Unknown error")
+                (
+                    error.message ||
+                    "Unknown error"
+                )
         });
     }
 });
