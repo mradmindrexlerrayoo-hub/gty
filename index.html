@@ -1,0 +1,188 @@
+```html
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+
+  <meta charset="UTF-8">
+
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1.0"
+  >
+
+  <title>Ask a Friend</title>
+
+  <link
+    rel="stylesheet"
+    href="style.css"
+  >
+
+</head>
+
+<body>
+
+  <main class="container">
+
+    <section class="card">
+
+      <div class="icon">
+        💸
+      </div>
+
+      <h1>
+        Ask a Friend
+      </h1>
+
+      <p class="subtitle">
+        Create a transparent payment request.
+      </p>
+
+
+      <form id="paymentForm">
+
+        <label>
+          Your name
+        </label>
+
+        <input
+          id="firstName"
+          type="text"
+          placeholder="John"
+          required
+        >
+
+
+        <label>
+          M-Pesa phone number
+        </label>
+
+        <input
+          id="phone"
+          type="tel"
+          placeholder="0712345678"
+          required
+        >
+
+
+        <label>
+          Amount
+        </label>
+
+        <div class="amounts">
+
+          <button
+            type="button"
+            data-amount="50"
+          >
+            KSh 50
+          </button>
+
+          <button
+            type="button"
+            data-amount="100"
+          >
+            KSh 100
+          </button>
+
+          <button
+            type="button"
+            data-amount="200"
+          >
+            KSh 200
+          </button>
+
+          <button
+            type="button"
+            data-amount="500"
+          >
+            KSh 500
+          </button>
+
+          <button
+            type="button"
+            data-amount="1000"
+          >
+            KSh 1,000
+          </button>
+
+        </div>
+
+
+        <input
+          id="amount"
+          type="number"
+          min="10"
+          max="150000"
+          placeholder="Or enter amount"
+          required
+        >
+
+
+        <label>
+          Reason
+        </label>
+
+        <textarea
+          id="reason"
+          placeholder="What is the money for?"
+          maxlength="250"
+          required
+        ></textarea>
+
+
+        <div class="recipient">
+
+          <span>
+            Payment processing
+          </span>
+
+          <strong>
+            IntaSend
+          </strong>
+
+        </div>
+
+
+        <button
+          class="pay-button"
+          type="submit"
+        >
+          Pay with M-Pesa
+        </button>
+
+      </form>
+
+
+      <div
+        id="status"
+        class="status"
+      ></div>
+
+
+      <p class="notice">
+
+        You will receive a genuine M-Pesa payment
+        prompt when the transaction is available.
+        Always confirm the amount and recipient
+        before entering your M-Pesa PIN.
+
+      </p>
+
+
+      <footer>
+        Payments processed by IntaSend.
+        This website is not operated by Safaricom.
+      </footer>
+
+    </section>
+
+  </main>
+
+
+  <script src="script.js"></script>
+
+</body>
+
+</html>
+```
