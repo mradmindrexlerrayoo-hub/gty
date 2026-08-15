@@ -1,202 +1,242 @@
-require("dotenv").config();
+const API_URL = "https://gty-5vwn.onrender.com";
 
-const express = require("express");
-const cors = require("cors");
-const IntaSend = require("intasend-node");
+document.addEventListener("DOMContentLoaded", () => {
+    console.log("Ask a Friend: JavaScript loaded");
 
-const app = express();
+    const form = document.getElementById("paymentForm");
+    const status = document.getElementById("status");
 
-app.use(express.json());
+    const firstNameInput = document.getElementById("firstName");
+    const phoneInput = document.getElementById("phone");
+    const amountInput = document.getElementById("amount");
+    const reasonInput = document.getElementById("reason");
 
-app.use(
-  cors({
-    origin: process.env.FRONTEND_URL || "*"
-  })
-);
+    // Find the payment button using either common ID/class
+    const payButton =
+        document.getElementById("payButton") ||
+        document.querySelector(".pay-button") ||
+        document.querySelector('button[type="submit"]');
 
-const PORT = process.env.PORT || 10000;
-
-// Keep this TRUE while testing.
-// Change to false only after your IntaSend live account
-// and payment flow have been properly verified.
-const SANDBOX = true;
-
-const intasend = new IntaSend(
-  process.env.INTASEND_PUBLISHABLE_KEY,
-  process.env.INTASEND_SECRET_KEY,
-  SANDBOX
-);
-
-const collection = intasend.collection();
-
-
-// --------------------------------------------------
-// HOME
-// --------------------------------------------------
-
-app.get("/", (req, res) => {
-  res.send("Money Request API is online.");
-});
-
-
-// --------------------------------------------------
-// HEALTH CHECK
-// --------------------------------------------------
-
-app.get("/health", (req, res) => {
-  res.json({
-    online: true
-  });
-});
-
-
-// --------------------------------------------------
-// START M-PESA PAYMENT
-// --------------------------------------------------
-
-app.post("/api/payment", async (req, res) => {
-  try {
-    const {
-      firstName,
-      lastName,
-      phone,
-      amount,
-      reason
-    } = req.body;
-
-    // Check required information
-    if (!firstName || !phone || !amount) {
-      return res.status(400).json({
-        success: false,
-        error: "Name, phone number and amount are required."
-      });
+    // Check that the page contains the expected elements
+    if (!form) {
+        console.error("paymentForm was not found");
+        return;
     }
 
-    // Clean phone number
-    const cleanPhone = String(phone)
-      .trim()
-      .replace(/\s/g, "");
-
-    let mpesaPhone;
-
-    // 0712345678
-    if (/^07\d{8}$/.test(cleanPhone)) {
-      mpesaPhone = "254" + cleanPhone.substring(1);
+    if (!amountInput) {
+        console.error("amount input was not found");
+        return;
     }
 
-    // +254712345678
-    else if (/^\+2547\d{8}$/.test(cleanPhone)) {
-      mpesaPhone = cleanPhone.substring(1);
+    if (!status) {
+        console.error("status element was not found");
     }
 
-    // 254712345678
-    else if (/^2547\d{8}$/.test(cleanPhone)) {
-      mpesaPhone = cleanPhone;
-    }
+    // --------------------------------------------------
+    // QUICK AMOUNT BUTTONS
+    // --------------------------------------------------
 
-    else {
-      return res.status(400).json({
-        success: false,
-        error:
-          "Enter a valid Kenyan M-Pesa number, for example 0712345678."
-      });
-    }
+    const amountButtons = document.querySelectorAll("[data-amount]");
 
+    amountButtons.forEach((button) => {
+        button.addEventListener("click", () => {
+            const selectedAmount = button.getAttribute("data-amount");
 
-    // Validate amount
-    const numericAmount = Number(amount);
+            amountInput.value = selectedAmount;
 
-    if (
-      !Number.isInteger(numericAmount) ||
-      numericAmount < 10 ||
-      numericAmount > 150000
-    ) {
-      return res.status(400).json({
-        success: false,
-        error:
-          "Amount must be between KSh 10 and KSh 150,000."
-      });
-    }
+            amountButtons.forEach((btn) => {
+                btn.classList.remove("selected");
+            });
 
+            button.classList.add("selected");
 
-    // Generate unique reference
-    const reference =
-      "REQUEST-" + Date.now();
-
-
-    // Start IntaSend M-Pesa STK Push
-    const payment =
-      await collection.mpesaStkPush({
-        first_name: firstName,
-        last_name: lastName || "Customer",
-        email: "customer@example.com",
-        host:
-          process.env.FRONTEND_URL ||
-          "https://example.com",
-        amount: numericAmount,
-        phone_number: mpesaPhone,
-        api_ref: reference
-      });
-
-
-    console.log("Payment started:", {
-      reference,
-      phone: mpesaPhone,
-      amount: numericAmount,
-      reason: reason || ""
+            setStatus(
+                "Amount selected: KSh " + selectedAmount,
+                false
+            );
+        });
     });
 
+    // --------------------------------------------------
+    // PAYMENT FORM
+    // --------------------------------------------------
 
-    res.json({
-      success: true,
-      reference: reference,
-      payment: payment
+    form.addEventListener("submit", async (event) => {
+        event.preventDefault();
+
+        console.log("Payment form submitted");
+
+        const firstName = firstNameInput
+            ? firstNameInput.value.trim()
+            : "";
+
+        const phone = phoneInput
+            ? phoneInput.value.trim()
+            : "";
+
+        const amount = amountInput
+            ? amountInput.value.trim()
+            : "";
+
+        const reason = reasonInput
+            ? reasonInput.value.trim()
+            : "";
+
+        // Validate name
+        if (!firstName) {
+            setStatus("Please enter your name.", true);
+            return;
+        }
+
+        // Validate phone
+        if (!phone) {
+            setStatus(
+                "Please enter the friend's M-Pesa number.",
+                true
+            );
+            return;
+        }
+
+        if (!/^07\d{8}$/.test(phone)) {
+            setStatus(
+                "Enter a valid Kenyan number, for example 0712345678.",
+                true
+            );
+            return;
+        }
+
+        // Validate amount
+        const numericAmount = Number(amount);
+
+        if (!numericAmount || numericAmount <= 0) {
+            setStatus(
+                "Please enter a valid amount.",
+                true
+            );
+            return;
+        }
+
+        // Validate reason
+        if (!reason) {
+            setStatus(
+                "Please enter the reason.",
+                true
+            );
+            return;
+        }
+
+        // Disable button while processing
+        if (payButton) {
+            payButton.disabled = true;
+        }
+
+        setStatus(
+            "Connecting to the payment server...",
+            false
+        );
+
+        console.log("Sending payment request to:", API_URL);
+
+        try {
+            const response = await fetch(
+                API_URL + "/api/payment",
+                {
+                    method: "POST",
+
+                    headers: {
+                        "Content-Type": "application/json"
+                    },
+
+                    body: JSON.stringify({
+                        firstName: firstName,
+                        phone: phone,
+                        amount: numericAmount,
+                        reason: reason
+                    })
+                }
+            );
+
+            console.log(
+                "Server response:",
+                response.status
+            );
+
+            const responseText = await response.text();
+
+            console.log(
+                "Server response body:",
+                responseText
+            );
+
+            let data = {};
+
+            try {
+                data = JSON.parse(responseText);
+            } catch (jsonError) {
+                data = {
+                    message: responseText
+                };
+            }
+
+            if (!response.ok) {
+                throw new Error(
+                    data.message ||
+                    data.error ||
+                    "Server error: HTTP " + response.status
+                );
+            }
+
+            if (data.success === false) {
+                throw new Error(
+                    data.message ||
+                    data.error ||
+                    "Payment request was not accepted."
+                );
+            }
+
+            setStatus(
+                data.message ||
+                "Payment request submitted successfully. Check the M-Pesa phone for the payment prompt.",
+                false
+            );
+
+        } catch (error) {
+            console.error(
+                "Payment error:",
+                error
+            );
+
+            setStatus(
+                "Payment connection failed: " +
+                error.message,
+                true
+            );
+
+        } finally {
+            if (payButton) {
+                payButton.disabled = false;
+            }
+        }
     });
 
-  } catch (error) {
+    // --------------------------------------------------
+    // STATUS MESSAGE
+    // --------------------------------------------------
 
-    console.error(
-      "IntaSend payment error:",
-      error
-    );
+    function setStatus(message, isError) {
+        if (!status) {
+            console.log(message);
+            return;
+        }
 
-    res.status(500).json({
-      success: false,
-      error:
-        "Unable to start the M-Pesa payment. Please try again."
-    });
-  }
-});
+        status.textContent = message;
 
+        if (isError) {
+            status.classList.add("error");
+        } else {
+            status.classList.remove("error");
+        }
+    }
 
-// --------------------------------------------------
-// INTASEND WEBHOOK
-// --------------------------------------------------
-
-app.post("/api/webhook", (req, res) => {
-
-  console.log(
-    "IntaSend webhook received:"
-  );
-
-  console.log(
-    JSON.stringify(req.body, null, 2)
-  );
-
-  res.status(200).json({
-    received: true
-  });
-});
-
-
-// --------------------------------------------------
-// START SERVER
-// --------------------------------------------------
-
-app.listen(PORT, () => {
-
-  console.log(
-    `Server running on port ${PORT}`
-  );
-
+    console.log("Ask a Friend: Ready");
 });
