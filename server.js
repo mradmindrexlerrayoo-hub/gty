@@ -14,15 +14,22 @@ const INTASEND_API_URL = INTASEND_LIVE
     : "https://sandbox.intasend.com";
 
 // =====================================================
-// CORS + BODY PARSING
+// CORS
 // =====================================================
 
-app.use(cors({
-    origin: true,
+const corsOptions = {
+    origin: "https://mradmindrexlerrayoo-hub.github.io",
     methods: ["GET", "POST", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Accept"]
-}));
+    allowedHeaders: ["Content-Type", "Accept"],
+    optionsSuccessStatus: 204
+};
 
+app.use(cors(corsOptions));
+
+// Handle browser preflight requests
+app.options("*", cors(corsOptions));
+
+// Parse JSON
 app.use(express.json());
 
 // =====================================================
@@ -73,8 +80,7 @@ app.post("/api/payment", async (req, res) => {
 
             return res.status(500).json({
                 success: false,
-                message:
-                    "Payment service is not configured on the server."
+                message: "Payment service is not configured on the server."
             });
         }
 
@@ -97,34 +103,27 @@ app.post("/api/payment", async (req, res) => {
         // PHONE
         // ---------------------------------------------
 
-        if (
-            !phone ||
-            typeof phone !== "string"
-        ) {
+        if (!phone || typeof phone !== "string") {
             return res.status(400).json({
                 success: false,
-                message:
-                    "Please enter the M-Pesa phone number."
+                message: "Please enter the M-Pesa phone number."
             });
         }
 
-        let cleanPhone =
-            phone.trim().replace(/\s+/g, "");
+        let cleanPhone = phone.trim().replace(/\s+/g, "");
 
         if (cleanPhone.startsWith("+254")) {
             cleanPhone = cleanPhone.substring(1);
         }
 
         if (cleanPhone.startsWith("07")) {
-            cleanPhone =
-                "254" + cleanPhone.substring(1);
+            cleanPhone = "254" + cleanPhone.substring(1);
         }
 
         if (!/^2547\d{8}$/.test(cleanPhone)) {
             return res.status(400).json({
                 success: false,
-                message:
-                    "Enter a valid Kenyan M-Pesa number."
+                message: "Enter a valid Kenyan M-Pesa number."
             });
         }
 
@@ -140,16 +139,14 @@ app.post("/api/payment", async (req, res) => {
         ) {
             return res.status(400).json({
                 success: false,
-                message:
-                    "Enter an amount of at least KSh 10."
+                message: "Enter an amount of at least KSh 10."
             });
         }
 
         if (numericAmount > 150000) {
             return res.status(400).json({
                 success: false,
-                message:
-                    "The maximum amount is KSh 150,000."
+                message: "The maximum amount is KSh 150,000."
             });
         }
 
@@ -164,8 +161,7 @@ app.post("/api/payment", async (req, res) => {
         ) {
             return res.status(400).json({
                 success: false,
-                message:
-                    "Please enter the reason."
+                message: "Please enter the reason."
             });
         }
 
@@ -173,8 +169,7 @@ app.post("/api/payment", async (req, res) => {
         // PAYMENT REFERENCE
         // ---------------------------------------------
 
-        const apiRef =
-            "ASKFRIEND-" + Date.now();
+        const apiRef = "ASKFRIEND-" + Date.now();
 
         console.log("Name:", firstName.trim());
         console.log("Phone:", cleanPhone);
@@ -193,7 +188,7 @@ app.post("/api/payment", async (req, res) => {
 
         const intasendResponse = await fetch(
             INTASEND_API_URL +
-                "/api/v1/payment/mpesa-stk-push/",
+            "/api/v1/payment/mpesa-stk-push/",
             {
                 method: "POST",
 
@@ -201,11 +196,9 @@ app.post("/api/payment", async (req, res) => {
                     "Authorization":
                         `Bearer ${INTASEND_SECRET_KEY}`,
 
-                    "Content-Type":
-                        "application/json",
+                    "Content-Type": "application/json",
 
-                    "Accept":
-                        "application/json"
+                    "Accept": "application/json"
                 },
 
                 body: JSON.stringify({
@@ -237,8 +230,7 @@ app.post("/api/payment", async (req, res) => {
         let intasendData;
 
         try {
-            intasendData =
-                JSON.parse(responseText);
+            intasendData = JSON.parse(responseText);
         } catch {
             intasendData = {
                 message: responseText
@@ -250,11 +242,8 @@ app.post("/api/payment", async (req, res) => {
         // ---------------------------------------------
 
         if (!intasendResponse.ok) {
-            return res.status(
-                intasendResponse.status
-            ).json({
+            return res.status(intasendResponse.status).json({
                 success: false,
-
                 message:
                     intasendData.message ||
                     intasendData.detail ||
@@ -314,19 +303,13 @@ app.use((req, res) => {
 // START SERVER
 // =====================================================
 
-app.listen(
-    PORT,
-    "0.0.0.0",
-    () => {
-        console.log(
-            `Ask a Friend server running on port ${PORT}`
-        );
+app.listen(PORT, "0.0.0.0", () => {
+    console.log(
+        `Ask a Friend server running on port ${PORT}`
+    );
 
-        console.log(
-            "IntaSend mode:",
-            INTASEND_LIVE
-                ? "LIVE"
-                : "SANDBOX"
-        );
-    }
-);
+    console.log(
+        "IntaSend mode:",
+        INTASEND_LIVE ? "LIVE" : "SANDBOX"
+    );
+});
