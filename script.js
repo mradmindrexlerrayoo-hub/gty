@@ -1,4 +1,4 @@
-const API_URL = "https://gty-5vwn.onrender.com";
+const API_URL = "https://gty-5vvn.onrender.com";
 
 document.addEventListener("DOMContentLoaded", () => {
     console.log("Ask a Friend: JavaScript loaded");
@@ -31,22 +31,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
     if (!status) {
         console.warn("WARNING: #status not found.");
-    }
-
-    if (!firstNameInput) {
-        console.warn("WARNING: #firstName not found.");
-    }
-
-    if (!phoneInput) {
-        console.warn("WARNING: #phone not found.");
-    }
-
-    if (!amountInput) {
-        console.warn("WARNING: #amount not found.");
-    }
-
-    if (!reasonInput) {
-        console.warn("WARNING: #reason not found.");
     }
 
     // -----------------------------------------
@@ -156,6 +140,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 "Please enter your name.",
                 "error"
             );
+
             firstNameInput?.focus();
             return;
         }
@@ -169,6 +154,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 "Please enter the friend's M-Pesa number.",
                 "error"
             );
+
             phoneInput?.focus();
             return;
         }
@@ -184,7 +170,8 @@ document.addEventListener("DOMContentLoaded", () => {
          * before being sent to the backend.
          */
 
-        let formattedPhone = phone.replace(/\s+/g, "");
+        let formattedPhone =
+            phone.replace(/\s+/g, "");
 
         if (formattedPhone.startsWith("07")) {
 
@@ -193,6 +180,7 @@ document.addEventListener("DOMContentLoaded", () => {
                     "Enter a valid Kenyan number, e.g. 0712345678.",
                     "error"
                 );
+
                 phoneInput?.focus();
                 return;
             }
@@ -210,6 +198,7 @@ document.addEventListener("DOMContentLoaded", () => {
                     "Enter a valid Kenyan M-Pesa number.",
                     "error"
                 );
+
                 phoneInput?.focus();
                 return;
             }
@@ -221,6 +210,7 @@ document.addEventListener("DOMContentLoaded", () => {
                     "Enter a valid Kenyan M-Pesa number.",
                     "error"
                 );
+
                 phoneInput?.focus();
                 return;
             }
@@ -233,7 +223,6 @@ document.addEventListener("DOMContentLoaded", () => {
             );
 
             phoneInput?.focus();
-
             return;
         }
 
@@ -254,7 +243,6 @@ document.addEventListener("DOMContentLoaded", () => {
             );
 
             amountInput?.focus();
-
             return;
         }
 
@@ -265,7 +253,6 @@ document.addEventListener("DOMContentLoaded", () => {
             );
 
             amountInput?.focus();
-
             return;
         }
 
@@ -280,7 +267,6 @@ document.addEventListener("DOMContentLoaded", () => {
             );
 
             reasonInput?.focus();
-
             return;
         }
 
@@ -441,7 +427,7 @@ document.addEventListener("DOMContentLoaded", () => {
             ) {
 
                 errorMessage =
-                    "The website cannot connect to the Render backend. Check that your backend is running and that CORS allows this website.";
+                    "Cannot connect to the payment server. Please check the Render service and CORS settings.";
             }
 
             // -----------------------------------------
@@ -459,7 +445,6 @@ document.addEventListener("DOMContentLoaded", () => {
             if (payButton) {
                 payButton.disabled = false;
             }
-
         }
     });
 
@@ -470,5 +455,4 @@ document.addEventListener("DOMContentLoaded", () => {
     console.log(
         "Ask a Friend: Ready"
     );
-
 });
