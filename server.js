@@ -10,9 +10,10 @@ const INTASEND_SECRET_KEY =
 const INTASEND_LIVE =
     String(process.env.INTASEND_LIVE).toLowerCase() === "true";
 
-const INTASEND_API_URL = INTASEND_LIVE
-    ? "https://api.intasend.com"
-    : "https://sandbox.intasend.com";
+const INTASEND_API_URL =
+    INTASEND_LIVE
+        ? "https://api.intasend.com"
+        : "https://sandbox.intasend.com";
 
 const ALLOWED_ORIGIN =
     "https://mradmindrexlerrayoo-hub.github.io";
@@ -59,7 +60,7 @@ app.use((req, res, next) => {
 
 
 // =====================================================
-// BODY PARSER
+// BODY PARSING
 // =====================================================
 
 app.use(express.json());
@@ -81,7 +82,7 @@ app.get("/", (req, res) => {
 
 
 // =====================================================
-// API TEST
+// API CONNECTION TEST
 // =====================================================
 
 app.get("/api/payment", (req, res) => {
@@ -117,9 +118,9 @@ app.post("/api/payment", async (req, res) => {
         } = req.body;
 
 
-        // =============================================
-        // CHECK INTASEND KEY
-        // =============================================
+        // ---------------------------------------------
+        // INTASEND KEY
+        // ---------------------------------------------
 
         if (!INTASEND_SECRET_KEY) {
 
@@ -139,9 +140,9 @@ app.post("/api/payment", async (req, res) => {
         }
 
 
-        // =============================================
+        // ---------------------------------------------
         // NAME
-        // =============================================
+        // ---------------------------------------------
 
         if (
             !firstName ||
@@ -161,9 +162,9 @@ app.post("/api/payment", async (req, res) => {
         }
 
 
-        // =============================================
+        // ---------------------------------------------
         // PHONE
-        // =============================================
+        // ---------------------------------------------
 
         if (
             !phone ||
@@ -188,7 +189,6 @@ app.post("/api/payment", async (req, res) => {
                 .replace(/\s+/g, "");
 
 
-        // +254712345678
         if (cleanPhone.startsWith("+254")) {
 
             cleanPhone =
@@ -197,7 +197,6 @@ app.post("/api/payment", async (req, res) => {
         }
 
 
-        // 0712345678
         if (cleanPhone.startsWith("07")) {
 
             cleanPhone =
@@ -207,7 +206,6 @@ app.post("/api/payment", async (req, res) => {
         }
 
 
-        // 254712345678
         if (!/^2547\d{8}$/.test(cleanPhone)) {
 
             return res.status(400).json({
@@ -222,9 +220,9 @@ app.post("/api/payment", async (req, res) => {
         }
 
 
-        // =============================================
+        // ---------------------------------------------
         // AMOUNT
-        // =============================================
+        // ---------------------------------------------
 
         const numericAmount =
             Number(amount);
@@ -261,9 +259,9 @@ app.post("/api/payment", async (req, res) => {
         }
 
 
-        // =============================================
+        // ---------------------------------------------
         // REASON
-        // =============================================
+        // ---------------------------------------------
 
         if (
             !reason ||
@@ -283,9 +281,9 @@ app.post("/api/payment", async (req, res) => {
         }
 
 
-        // =============================================
-        // REFERENCE
-        // =============================================
+        // ---------------------------------------------
+        // PAYMENT REFERENCE
+        // ---------------------------------------------
 
         const apiRef =
             "ASKFRIEND-" +
@@ -325,9 +323,9 @@ app.post("/api/payment", async (req, res) => {
         );
 
 
-        // =============================================
+        // ---------------------------------------------
         // INTASEND REQUEST
-        // =============================================
+        // ---------------------------------------------
 
         const intasendUrl =
             INTASEND_API_URL +
@@ -335,7 +333,7 @@ app.post("/api/payment", async (req, res) => {
 
 
         console.log(
-            "Sending request to:",
+            "IntaSend URL:",
             intasendUrl
         );
 
@@ -380,9 +378,9 @@ app.post("/api/payment", async (req, res) => {
             );
 
 
-        // =============================================
+        // ---------------------------------------------
         // READ INTASEND RESPONSE
-        // =============================================
+        // ---------------------------------------------
 
         const responseText =
             await intasendResponse.text();
@@ -413,7 +411,6 @@ app.post("/api/payment", async (req, res) => {
 
         let intasendData;
 
-
         try {
 
             intasendData =
@@ -422,18 +419,16 @@ app.post("/api/payment", async (req, res) => {
         } catch {
 
             intasendData = {
-
                 raw_response:
                     responseText
-
             };
 
         }
 
 
-        // =============================================
-        // INTASEND REJECTION
-        // =============================================
+        // ---------------------------------------------
+        // INTASEND ERROR
+        // ---------------------------------------------
 
         if (!intasendResponse.ok) {
 
@@ -441,13 +436,30 @@ app.post("/api/payment", async (req, res) => {
                 "INTASEND REJECTED THE PAYMENT REQUEST."
             );
 
+            console.error(
+                "STATUS:",
+                intasendResponse.status
+            );
+
+            console.error(
+                "RESPONSE:",
+                responseText
+            );
+
+
+            // IMPORTANT:
+            // Return the real IntaSend response
+            // to the browser so we can diagnose it.
 
             return res.status(502).json({
 
                 success: false,
 
                 message:
-                    "IntaSend rejected the request.",
+                    "IntaSend error " +
+                    intasendResponse.status +
+                    ": " +
+                    responseText,
 
                 intasend_status:
                     intasendResponse.status,
@@ -460,9 +472,9 @@ app.post("/api/payment", async (req, res) => {
         }
 
 
-        // =============================================
+        // ---------------------------------------------
         // SUCCESS
-        // =============================================
+        // ---------------------------------------------
 
         console.log(
             "INTASEND ACCEPTED THE PAYMENT REQUEST."
@@ -477,10 +489,7 @@ app.post("/api/payment", async (req, res) => {
                 "Payment request sent. Check the M-Pesa phone for the payment prompt.",
 
             reference:
-                apiRef,
-
-            intasend_response:
-                intasendData
+                apiRef
 
         });
 
@@ -510,11 +519,11 @@ app.post("/api/payment", async (req, res) => {
             success: false,
 
             message:
-                "Payment server error.",
-
-            error:
-                error.message ||
-                "Unknown error"
+                "Payment server error: " +
+                (
+                    error.message ||
+                    "Unknown error"
+                )
 
         });
 
