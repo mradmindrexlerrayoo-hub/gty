@@ -45,7 +45,11 @@ app.use((req, res, next) => {
     );
 
     if (req.method === "OPTIONS") {
-        console.log("CORS PREFLIGHT:", req.path);
+
+        console.log(
+            "CORS PREFLIGHT:",
+            req.path
+        );
 
         return res.status(204).end();
     }
@@ -69,7 +73,8 @@ app.get("/", (req, res) => {
 
     res.json({
         success: true,
-        message: "Ask a Friend payment server is online."
+        message:
+            "Ask a Friend payment server is online."
     });
 
 });
@@ -83,7 +88,8 @@ app.get("/api/payment", (req, res) => {
 
     res.json({
         success: true,
-        message: "Payment API is reachable."
+        message:
+            "Payment API is reachable."
     });
 
 });
@@ -97,9 +103,11 @@ app.post("/api/payment", async (req, res) => {
 
     try {
 
+        console.log("");
         console.log("================================");
         console.log("PAYMENT REQUEST RECEIVED");
         console.log("================================");
+
 
         const {
             firstName,
@@ -109,14 +117,14 @@ app.post("/api/payment", async (req, res) => {
         } = req.body;
 
 
-        // ---------------------------------------------
-        // INTASEND KEY
-        // ---------------------------------------------
+        // =============================================
+        // CHECK INTASEND KEY
+        // =============================================
 
         if (!INTASEND_SECRET_KEY) {
 
             console.error(
-                "INTASEND_SECRET_KEY is missing."
+                "INTASEND_SECRET_KEY IS MISSING"
             );
 
             return res.status(500).json({
@@ -131,9 +139,9 @@ app.post("/api/payment", async (req, res) => {
         }
 
 
-        // ---------------------------------------------
+        // =============================================
         // NAME
-        // ---------------------------------------------
+        // =============================================
 
         if (
             !firstName ||
@@ -153,9 +161,9 @@ app.post("/api/payment", async (req, res) => {
         }
 
 
-        // ---------------------------------------------
+        // =============================================
         // PHONE
-        // ---------------------------------------------
+        // =============================================
 
         if (
             !phone ||
@@ -175,9 +183,12 @@ app.post("/api/payment", async (req, res) => {
 
 
         let cleanPhone =
-            phone.trim().replace(/\s+/g, "");
+            phone
+                .trim()
+                .replace(/\s+/g, "");
 
 
+        // +254712345678
         if (cleanPhone.startsWith("+254")) {
 
             cleanPhone =
@@ -186,14 +197,17 @@ app.post("/api/payment", async (req, res) => {
         }
 
 
+        // 0712345678
         if (cleanPhone.startsWith("07")) {
 
             cleanPhone =
-                "254" + cleanPhone.substring(1);
+                "254" +
+                cleanPhone.substring(1);
 
         }
 
 
+        // 254712345678
         if (!/^2547\d{8}$/.test(cleanPhone)) {
 
             return res.status(400).json({
@@ -208,9 +222,9 @@ app.post("/api/payment", async (req, res) => {
         }
 
 
-        // ---------------------------------------------
+        // =============================================
         // AMOUNT
-        // ---------------------------------------------
+        // =============================================
 
         const numericAmount =
             Number(amount);
@@ -247,9 +261,9 @@ app.post("/api/payment", async (req, res) => {
         }
 
 
-        // ---------------------------------------------
+        // =============================================
         // REASON
-        // ---------------------------------------------
+        // =============================================
 
         if (
             !reason ||
@@ -269,38 +283,72 @@ app.post("/api/payment", async (req, res) => {
         }
 
 
-        // ---------------------------------------------
+        // =============================================
         // REFERENCE
-        // ---------------------------------------------
+        // =============================================
 
         const apiRef =
-            "ASKFRIEND-" + Date.now();
+            "ASKFRIEND-" +
+            Date.now();
 
 
-        console.log("Name:", firstName.trim());
-        console.log("Phone:", cleanPhone);
-        console.log("Amount:", numericAmount);
-        console.log("Reason:", reason.trim());
-        console.log("Reference:", apiRef);
+        console.log(
+            "Name:",
+            firstName.trim()
+        );
+
+        console.log(
+            "Phone:",
+            cleanPhone
+        );
+
+        console.log(
+            "Amount:",
+            numericAmount
+        );
+
+        console.log(
+            "Reason:",
+            reason.trim()
+        );
+
+        console.log(
+            "Reference:",
+            apiRef
+        );
 
         console.log(
             "IntaSend mode:",
-            INTASEND_LIVE ? "LIVE" : "SANDBOX"
+            INTASEND_LIVE
+                ? "LIVE"
+                : "SANDBOX"
         );
 
 
-        // ---------------------------------------------
-        // INTASEND STK PUSH
-        // ---------------------------------------------
+        // =============================================
+        // INTASEND REQUEST
+        // =============================================
+
+        const intasendUrl =
+            INTASEND_API_URL +
+            "/api/v1/payment/mpesa-stk-push/";
+
+
+        console.log(
+            "Sending request to:",
+            intasendUrl
+        );
+
 
         const intasendResponse =
             await fetch(
-                INTASEND_API_URL +
-                "/api/v1/payment/mpesa-stk-push/",
+                intasendUrl,
                 {
+
                     method: "POST",
 
                     headers: {
+
                         "Authorization":
                             `Bearer ${INTASEND_SECRET_KEY}`,
 
@@ -309,6 +357,7 @@ app.post("/api/payment", async (req, res) => {
 
                         "Accept":
                             "application/json"
+
                     },
 
                     body: JSON.stringify({
@@ -326,30 +375,44 @@ app.post("/api/payment", async (req, res) => {
                             "BUSINESS-PAYS"
 
                     })
+
                 }
             );
 
 
-        // ---------------------------------------------
-        // INTASEND RESPONSE
-        // ---------------------------------------------
+        // =============================================
+        // READ INTASEND RESPONSE
+        // =============================================
 
         const responseText =
             await intasendResponse.text();
 
 
+        console.log("");
         console.log(
-            "IntaSend HTTP status:",
+            "================================"
+        );
+
+        console.log(
+            "INTASEND HTTP STATUS:",
             intasendResponse.status
         );
 
         console.log(
-            "IntaSend response:",
+            "INTASEND RESPONSE:"
+        );
+
+        console.log(
             responseText
+        );
+
+        console.log(
+            "================================"
         );
 
 
         let intasendData;
+
 
         try {
 
@@ -359,41 +422,50 @@ app.post("/api/payment", async (req, res) => {
         } catch {
 
             intasendData = {
-                message: responseText
+
+                raw_response:
+                    responseText
+
             };
 
         }
 
 
-        // ---------------------------------------------
-        // INTASEND ERROR
-        // ---------------------------------------------
+        // =============================================
+        // INTASEND REJECTION
+        // =============================================
 
         if (!intasendResponse.ok) {
 
-            return res.status(
-                intasendResponse.status
-            ).json({
+            console.error(
+                "INTASEND REJECTED THE PAYMENT REQUEST."
+            );
+
+
+            return res.status(502).json({
 
                 success: false,
 
                 message:
-                    intasendData.message ||
-                    intasendData.detail ||
-                    intasendData.error ||
-                    "IntaSend rejected the payment request."
+                    "IntaSend rejected the request.",
+
+                intasend_status:
+                    intasendResponse.status,
+
+                intasend_response:
+                    intasendData
 
             });
 
         }
 
 
-        // ---------------------------------------------
+        // =============================================
         // SUCCESS
-        // ---------------------------------------------
+        // =============================================
 
         console.log(
-            "IntaSend accepted the payment request."
+            "INTASEND ACCEPTED THE PAYMENT REQUEST."
         );
 
 
@@ -405,16 +477,31 @@ app.post("/api/payment", async (req, res) => {
                 "Payment request sent. Check the M-Pesa phone for the payment prompt.",
 
             reference:
-                apiRef
+                apiRef,
+
+            intasend_response:
+                intasendData
 
         });
 
 
     } catch (error) {
 
+        console.error("");
         console.error(
-            "PAYMENT SERVER ERROR:",
+            "================================"
+        );
+
+        console.error(
+            "PAYMENT SERVER ERROR:"
+        );
+
+        console.error(
             error
+        );
+
+        console.error(
+            "================================"
         );
 
 
@@ -423,11 +510,11 @@ app.post("/api/payment", async (req, res) => {
             success: false,
 
             message:
-                "Payment server error: " +
-                (
-                    error.message ||
-                    "Unknown error"
-                )
+                "Payment server error.",
+
+            error:
+                error.message ||
+                "Unknown error"
 
         });
 
@@ -463,6 +550,11 @@ app.listen(
     "0.0.0.0",
     () => {
 
+        console.log("");
+        console.log(
+            "================================"
+        );
+
         console.log(
             `Ask a Friend server running on port ${PORT}`
         );
@@ -472,6 +564,15 @@ app.listen(
             INTASEND_LIVE
                 ? "LIVE"
                 : "SANDBOX"
+        );
+
+        console.log(
+            "CORS origin:",
+            ALLOWED_ORIGIN
+        );
+
+        console.log(
+            "================================"
         );
 
     }
