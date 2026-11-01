@@ -1,588 +1,521 @@
+require("dotenv").config();
+
 const express = require("express");
+const cors = require("cors");
+const crypto = require("crypto");
 
 const app = express();
-
 const PORT = process.env.PORT || 10000;
 
-const INTASEND_SECRET_KEY =
-    process.env.INTASEND_SECRET_KEY;
-
-const INTASEND_LIVE =
-    String(process.env.INTASEND_LIVE).toLowerCase() === "true";
-
-const INTASEND_API_URL =
-    INTASEND_LIVE
-        ? "https://api.intasend.com"
-        : "https://sandbox.intasend.com";
-
-const ALLOWED_ORIGIN =
-    "https://mradmindrexlerrayoo-hub.github.io";
-
-
-// =====================================================
-// CORS
-// =====================================================
-
-app.use((req, res, next) => {
-
-    res.setHeader(
-        "Access-Control-Allow-Origin",
-        ALLOWED_ORIGIN
-    );
-
-    res.setHeader(
-        "Access-Control-Allow-Methods",
-        "GET, POST, OPTIONS"
-    );
-
-    res.setHeader(
-        "Access-Control-Allow-Headers",
-        "Content-Type, Accept"
-    );
-
-    res.setHeader(
-        "Access-Control-Max-Age",
-        "86400"
-    );
-
-    if (req.method === "OPTIONS") {
-
-        console.log(
-            "CORS PREFLIGHT:",
-            req.path
-        );
-
-        return res.status(204).end();
-    }
-
-    next();
-});
-
-
-// =====================================================
-// BODY PARSING
-// =====================================================
+app.use(cors({
+    origin: "https://mradmindrexlerrayoo-hub.github.io"
+}));
 
 app.use(express.json());
 
+const {
+    DARAJA_CONSUMER_KEY,
+    DARAJA_CONSUMER_SECRET,
+    DARAJA_SHORTCODE,
+    DARAJA_PASSKEY,
+    DARAJA_CALLBACK_URL,
+    SUPABASE_URL,
+    SUPABASE_SERVICE_ROLE_KEY
+} = process.env;
 
-// =====================================================
-// HOME
-// =====================================================
+const DARAJA_BASE_URL = "https://sandbox.safaricom.co.ke";
 
+const SUPABASE_TABLE_URL =
+    `${SUPABASE_URL.replace(/\/$/, "")}/rest/v1/payments`;
+
+// Check required environment variables
+const requiredVariables = [
+    "DARAJA_CONSUMER_KEY",
+    "DARAJA_CONSUMER_SECRET",
+    "DARAJA_SHORTCODE",
+    "DARAJA_PASSKEY",
+    "DARAJA_CALLBACK_URL",
+    "SUPABASE_URL",
+    "SUPABASE_SERVICE_ROLE_KEY"
+];
+
+for (const variable of requiredVariables) {
+    if (!process.env[variable]) {
+        console.error(`Missing environment variable: ${variable}`);
+    }
+}
+
+// Supabase headers
+function supabaseHeaders(extra = {}) {
+    return {
+        apikey: SUPABASE_SERVICE_ROLE_KEY,
+        Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+        "Content-Type": "application/json",
+        ...extra
+    };
+}
+
+// Save payment to Supabase
+async function savePayment(payment) {
+    const response = await fetch(SUPABASE_TABLE_URL, {
+        method: "POST",
+        headers: supabaseHeaders({
+            Prefer: "return=representation"
+        }),
+        body: JSON.stringify(payment)
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+        console.error("Supabase insert error:", data);
+        throw new Error("Could not save payment.");
+    }
+
+    return data[0];
+}
+
+// Update payment in Supabase
+async function updatePayment(reference, updates) {
+    const response = await fetch(
+        `${SUPABASE_TABLE_URL}?reference=eq.${encodeURIComponent(reference)}`,
+        {
+            method: "PATCH",
+            headers: supabaseHeaders({
+                Prefer: "return=representation"
+            }),
+            body: JSON.stringify({
+                ...updates,
+                updated_at: new Date().toISOString()
+            })
+        }
+    );
+
+    const data = await response.json();
+
+    if (!response.ok) {
+        console.error("Supabase update error:", data);
+        throw new Error("Could not update payment.");
+    }
+
+    return data;
+}
+
+// Find payment by reference
+async function findPayment(reference) {
+    const response = await fetch(
+        `${SUPABASE_TABLE_URL}?reference=eq.${encodeURIComponent(reference)}&select=*`,
+        {
+            method: "GET",
+            headers: supabaseHeaders()
+        }
+    );
+
+    const data = await response.json();
+
+    if (!response.ok) {
+        console.error("Supabase lookup error:", data);
+        throw new Error("Could not retrieve payment.");
+    }
+
+    return data[0] || null;
+}
+
+// Find payment by CheckoutRequestID
+async function findPaymentByCheckoutId(checkoutId) {
+    const response = await fetch(
+        `${SUPABASE_TABLE_URL}?checkout_request_id=eq.${encodeURIComponent(checkoutId)}&select=*`,
+        {
+            method: "GET",
+            headers: supabaseHeaders()
+        }
+    );
+
+    const data = await response.json();
+
+    if (!response.ok) {
+        console.error("Supabase lookup error:", data);
+        throw new Error("Could not retrieve payment.");
+    }
+
+    return data[0] || null;
+}
+
+// Normalize Kenyan phone numbers
+function normalizePhone(phone) {
+    let number = String(phone).replace(/\D/g, "");
+
+    if (number.startsWith("0")) {
+        number = "254" + number.substring(1);
+    } else if (number.startsWith("7") || number.startsWith("1")) {
+        number = "254" + number;
+    }
+
+    if (!/^254[71]\d{8}$/.test(number)) {
+        throw new Error("Enter a valid Kenyan M-Pesa phone number.");
+    }
+
+    return number;
+}
+
+// Generate Daraja timestamp
+function getTimestamp() {
+    const date = new Date();
+
+    const parts = new Intl.DateTimeFormat("en-GB", {
+        timeZone: "Africa/Nairobi",
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit",
+        hourCycle: "h23"
+    }).formatToParts(date);
+
+    const values = {};
+
+    for (const part of parts) {
+        if (part.type !== "literal") {
+            values[part.type] = part.value;
+        }
+    }
+
+    return (
+        values.year +
+        values.month +
+        values.day +
+        values.hour +
+        values.minute +
+        values.second
+    );
+}
+
+// Get Daraja OAuth access token
+async function getAccessToken() {
+    const credentials = Buffer.from(
+        `${DARAJA_CONSUMER_KEY}:${DARAJA_CONSUMER_SECRET}`
+    ).toString("base64");
+
+    const response = await fetch(
+        `${DARAJA_BASE_URL}/oauth/v1/generate?grant_type=client_credentials`,
+        {
+            method: "GET",
+            headers: {
+                Authorization: `Basic ${credentials}`
+            }
+        }
+    );
+
+    const data = await response.json();
+
+    if (!response.ok || !data.access_token) {
+        console.error("Daraja OAuth error:", data);
+        throw new Error("Could not authenticate with M-Pesa.");
+    }
+
+    return data.access_token;
+}
+
+// Generate STK Push password
+function generatePassword(timestamp) {
+    return Buffer.from(
+        `${DARAJA_SHORTCODE}${DARAJA_PASSKEY}${timestamp}`
+    ).toString("base64");
+}
+
+// Initiate Daraja STK Push
+async function initiateSTKPush(phone, amount, reference) {
+    const token = await getAccessToken();
+    const timestamp = getTimestamp();
+
+    const payload = {
+        BusinessShortCode: DARAJA_SHORTCODE,
+        Password: generatePassword(timestamp),
+        Timestamp: timestamp,
+        TransactionType: "CustomerPayBillOnline",
+        Amount: Math.round(amount),
+        PartyA: phone,
+        PartyB: DARAJA_SHORTCODE,
+        PhoneNumber: phone,
+        CallBackURL: DARAJA_CALLBACK_URL,
+        AccountReference: reference.substring(0, 12),
+        TransactionDesc: "GTY Payment"
+    };
+
+    const response = await fetch(
+        `${DARAJA_BASE_URL}/mpesa/stkpush/v1/processrequest`,
+        {
+            method: "POST",
+            headers: {
+                Authorization: `Bearer ${token}`,
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify(payload)
+        }
+    );
+
+    const data = await response.json();
+
+    if (!response.ok || data.ResponseCode !== "0") {
+        console.error("STK Push error:", data);
+        throw new Error(
+            data.errorMessage ||
+            data.ResponseDescription ||
+            "M-Pesa STK Push failed."
+        );
+    }
+
+    return data;
+}
+
+// Query STK transaction status with Daraja
+async function querySTKStatus(checkoutRequestId) {
+    const token = await getAccessToken();
+    const timestamp = getTimestamp();
+
+    const payload = {
+        BusinessShortCode: DARAJA_SHORTCODE,
+        Password: generatePassword(timestamp),
+        Timestamp: timestamp,
+        CheckoutRequestID: checkoutRequestId
+    };
+
+    const response = await fetch(
+        `${DARAJA_BASE_URL}/mpesa/stkpushquery/v1/query`,
+        {
+            method: "POST",
+            headers: {
+                Authorization: `Bearer ${token}`,
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify(payload)
+        }
+    );
+
+    return await response.json();
+}
+
+// Health check
 app.get("/", (req, res) => {
-
     res.json({
         success: true,
-        message:
-            "Ask a Friend payment server is online."
+        message: "GTY Payment API is running."
     });
-
 });
 
-
-// =====================================================
-// API CONNECTION TEST
-// =====================================================
-
+// API check
 app.get("/api/payment", (req, res) => {
-
     res.json({
         success: true,
-        message:
-            "Payment API is reachable."
+        message: "GTY Daraja M-Pesa API is ready."
     });
-
 });
 
-
-// =====================================================
-// PAYMENT
-// =====================================================
-
+// Initiate payment
 app.post("/api/payment", async (req, res) => {
+    let reference;
 
     try {
+        const { firstName, phone, amount, reason } = req.body;
 
-        console.log("");
-        console.log("================================");
-        console.log("PAYMENT REQUEST RECEIVED");
-        console.log("================================");
-
-
-        const {
-            firstName,
-            phone,
-            amount,
-            reason
-        } = req.body;
-
-
-        // ---------------------------------------------
-        // INTASEND KEY
-        // ---------------------------------------------
-
-        if (!INTASEND_SECRET_KEY) {
-
-            console.error(
-                "INTASEND_SECRET_KEY IS MISSING"
-            );
-
-            return res.status(500).json({
-
+        if (!firstName || !phone || !amount || !reason) {
+            return res.status(400).json({
                 success: false,
-
-                message:
-                    "Payment service is not configured on the server."
-
+                message: "Please fill in all required fields."
             });
-
         }
 
-
-        // ---------------------------------------------
-        // NAME
-        // ---------------------------------------------
+        const paymentAmount = Number(amount);
 
         if (
-            !firstName ||
-            typeof firstName !== "string" ||
-            !firstName.trim()
+            !Number.isFinite(paymentAmount) ||
+            paymentAmount < 10 ||
+            paymentAmount > 150000
         ) {
-
             return res.status(400).json({
-
                 success: false,
-
-                message:
-                    "Please enter your name."
-
+                message: "Amount must be between KES 10 and KES 150,000."
             });
-
         }
 
+        const normalizedPhone = normalizePhone(phone);
 
-        // ---------------------------------------------
-        // PHONE
-        // ---------------------------------------------
+        reference =
+            "GTY-" + crypto.randomBytes(12).toString("hex").toUpperCase();
 
-        if (
-            !phone ||
-            typeof phone !== "string"
-        ) {
+        // Save pending payment before sending STK Push
+        await savePayment({
+            reference,
+            first_name: String(firstName).trim(),
+            phone: normalizedPhone,
+            amount: paymentAmount,
+            reason: String(reason).trim(),
+            status: "PENDING"
+        });
 
-            return res.status(400).json({
-
-                success: false,
-
-                message:
-                    "Please enter the M-Pesa phone number."
-
-            });
-
-        }
-
-
-        let cleanPhone =
-            phone
-                .trim()
-                .replace(/\s+/g, "");
-
-
-        if (cleanPhone.startsWith("+254")) {
-
-            cleanPhone =
-                cleanPhone.substring(1);
-
-        }
-
-
-        if (cleanPhone.startsWith("07")) {
-
-            cleanPhone =
-                "254" +
-                cleanPhone.substring(1);
-
-        }
-
-
-        if (!/^2547\d{8}$/.test(cleanPhone)) {
-
-            return res.status(400).json({
-
-                success: false,
-
-                message:
-                    "Enter a valid Kenyan M-Pesa number."
-
-            });
-
-        }
-
-
-        // ---------------------------------------------
-        // AMOUNT
-        // ---------------------------------------------
-
-        const numericAmount =
-            Number(amount);
-
-
-        if (
-            !Number.isFinite(numericAmount) ||
-            numericAmount < 10
-        ) {
-
-            return res.status(400).json({
-
-                success: false,
-
-                message:
-                    "Enter an amount of at least KSh 10."
-
-            });
-
-        }
-
-
-        if (numericAmount > 150000) {
-
-            return res.status(400).json({
-
-                success: false,
-
-                message:
-                    "The maximum amount is KSh 150,000."
-
-            });
-
-        }
-
-
-        // ---------------------------------------------
-        // REASON
-        // ---------------------------------------------
-
-        if (
-            !reason ||
-            typeof reason !== "string" ||
-            !reason.trim()
-        ) {
-
-            return res.status(400).json({
-
-                success: false,
-
-                message:
-                    "Please enter the reason."
-
-            });
-
-        }
-
-
-        // ---------------------------------------------
-        // PAYMENT REFERENCE
-        // ---------------------------------------------
-
-        const apiRef =
-            "ASKFRIEND-" +
-            Date.now();
-
-
-        console.log(
-            "Name:",
-            firstName.trim()
+        const stkResponse = await initiateSTKPush(
+            normalizedPhone,
+            paymentAmount,
+            reference
         );
 
-        console.log(
-            "Phone:",
-            cleanPhone
-        );
-
-        console.log(
-            "Amount:",
-            numericAmount
-        );
-
-        console.log(
-            "Reason:",
-            reason.trim()
-        );
-
-        console.log(
-            "Reference:",
-            apiRef
-        );
-
-        console.log(
-            "IntaSend mode:",
-            INTASEND_LIVE
-                ? "LIVE"
-                : "SANDBOX"
-        );
-
-
-        // ---------------------------------------------
-        // INTASEND REQUEST
-        // ---------------------------------------------
-
-        const intasendUrl =
-            INTASEND_API_URL +
-            "/api/v1/payment/mpesa-stk-push/";
-
-
-        console.log(
-            "IntaSend URL:",
-            intasendUrl
-        );
-
-
-        const intasendResponse =
-            await fetch(
-                intasendUrl,
-                {
-
-                    method: "POST",
-
-                    headers: {
-
-                        "Authorization":
-                            `Bearer ${INTASEND_SECRET_KEY}`,
-
-                        "Content-Type":
-                            "application/json",
-
-                        "Accept":
-                            "application/json"
-
-                    },
-
-                    body: JSON.stringify({
-
-                        amount:
-                            numericAmount,
-
-                        phone_number:
-                            cleanPhone,
-
-                        api_ref:
-                            apiRef,
-
-                        mobile_tarrif:
-                            "BUSINESS-PAYS"
-
-                    })
-
-                }
-            );
-
-
-        // ---------------------------------------------
-        // READ INTASEND RESPONSE
-        // ---------------------------------------------
-
-        const responseText =
-            await intasendResponse.text();
-
-
-        console.log("");
-        console.log(
-            "================================"
-        );
-
-        console.log(
-            "INTASEND HTTP STATUS:",
-            intasendResponse.status
-        );
-
-        console.log(
-            "INTASEND RESPONSE:"
-        );
-
-        console.log(
-            responseText
-        );
-
-        console.log(
-            "================================"
-        );
-
-
-        let intasendData;
-
-        try {
-
-            intasendData =
-                JSON.parse(responseText);
-
-        } catch {
-
-            intasendData = {
-                raw_response:
-                    responseText
-            };
-
-        }
-
-
-        // ---------------------------------------------
-        // INTASEND ERROR
-        // ---------------------------------------------
-
-        if (!intasendResponse.ok) {
-
-            console.error(
-                "INTASEND REJECTED THE PAYMENT REQUEST."
-            );
-
-            console.error(
-                "STATUS:",
-                intasendResponse.status
-            );
-
-            console.error(
-                "RESPONSE:",
-                responseText
-            );
-
-
-            // IMPORTANT:
-            // Return the real IntaSend response
-            // to the browser so we can diagnose it.
-
-            return res.status(502).json({
-
-                success: false,
-
-                message:
-                    "IntaSend error " +
-                    intasendResponse.status +
-                    ": " +
-                    responseText,
-
-                intasend_status:
-                    intasendResponse.status,
-
-                intasend_response:
-                    intasendData
-
-            });
-
-        }
-
-
-        // ---------------------------------------------
-        // SUCCESS
-        // ---------------------------------------------
-
-        console.log(
-            "INTASEND ACCEPTED THE PAYMENT REQUEST."
-        );
-
+        await updatePayment(reference, {
+            checkout_request_id: stkResponse.CheckoutRequestID,
+            merchant_request_id: stkResponse.MerchantRequestID
+        });
 
         return res.json({
-
             success: true,
-
-            message:
-                "Payment request sent. Check the M-Pesa phone for the payment prompt.",
-
-            reference:
-                apiRef
-
+            message: stkResponse.CustomerMessage ||
+                "STK Push sent. Check your phone and enter your M-Pesa PIN.",
+            reference,
+            checkoutRequestId: stkResponse.CheckoutRequestID
         });
-
 
     } catch (error) {
+        console.error("Payment initiation error:", error);
 
-        console.error("");
-        console.error(
-            "================================"
-        );
-
-        console.error(
-            "PAYMENT SERVER ERROR:"
-        );
-
-        console.error(
-            error
-        );
-
-        console.error(
-            "================================"
-        );
-
+        if (reference) {
+            try {
+                await updatePayment(reference, {
+                    status: "FAILED"
+                });
+            } catch (updateError) {
+                console.error("Could not mark payment failed:", updateError);
+            }
+        }
 
         return res.status(500).json({
-
             success: false,
-
-            message:
-                "Payment server error: " +
-                (
-                    error.message ||
-                    "Unknown error"
-                )
-
+            message: error.message || "Payment could not be started."
         });
-
     }
-
 });
 
-
-// =====================================================
-// 404
-// =====================================================
-
-app.use((req, res) => {
-
-    res.status(404).json({
-
-        success: false,
-
-        message:
-            "Endpoint not found."
-
+// Safaricom Daraja callback
+app.post("/api/mpesa/callback", async (req, res) => {
+    // Respond promptly to Safaricom
+    res.status(200).json({
+        ResultCode: 0,
+        ResultDesc: "Accepted"
     });
 
+    try {
+        const callback = req.body?.Body?.stkCallback;
+
+        if (!callback) {
+            console.error("Invalid M-Pesa callback received.");
+            return;
+        }
+
+        const checkoutId = callback.CheckoutRequestID;
+        const resultCode = Number(callback.ResultCode);
+
+        const payment = await findPaymentByCheckoutId(checkoutId);
+
+        if (!payment) {
+            console.error("No payment found for checkout:", checkoutId);
+            return;
+        }
+
+        // Ignore duplicate callbacks for completed payments
+        if (payment.status === "PAID" || payment.status === "FAILED") {
+            return;
+        }
+
+        if (resultCode !== 0) {
+            await updatePayment(payment.reference, {
+                status: "FAILED"
+            });
+
+            console.log("M-Pesa payment failed:", callback.ResultDesc);
+            return;
+        }
+
+        const items =
+            callback.CallbackMetadata?.Item || [];
+
+        const metadata = {};
+
+        for (const item of items) {
+            metadata[item.Name] = item.Value;
+        }
+
+        const receipt = metadata.MpesaReceiptNumber;
+        const paidAmount = Number(metadata.Amount);
+        const paidPhone = String(metadata.PhoneNumber || "");
+
+        // Check callback details against the saved payment
+        if (
+            !receipt ||
+            paidAmount !== Number(payment.amount) ||
+            paidPhone !== payment.phone
+        ) {
+            console.error("Callback details did not match payment:", checkoutId);
+            return;
+        }
+
+        // Ask Daraja to confirm the STK transaction
+        const queryResult = await querySTKStatus(checkoutId);
+
+        if (
+            String(queryResult.ResultCode) !== "0"
+        ) {
+            console.error("STK query has not confirmed payment:", queryResult);
+            return;
+        }
+
+        await updatePayment(payment.reference, {
+            status: "PAID",
+            mpesa_receipt_number: receipt
+        });
+
+        console.log(
+            "Payment confirmed:",
+            payment.reference,
+            receipt
+        );
+
+    } catch (error) {
+        console.error("M-Pesa callback processing error:", error);
+    }
 });
 
+// Check payment status
+app.get("/api/payment/status/:reference", async (req, res) => {
+    try {
+        const reference = req.params.reference;
 
-// =====================================================
-// START SERVER
-// =====================================================
+        const payment = await findPayment(reference);
 
-app.listen(
-    PORT,
-    "0.0.0.0",
-    () => {
+        if (!payment) {
+            return res.status(404).json({
+                success: false,
+                message: "Payment not found."
+            });
+        }
 
-        console.log("");
-        console.log(
-            "================================"
-        );
+        return res.json({
+            success: true,
+            reference: payment.reference,
+            status: payment.status,
+            receipt: payment.status === "PAID"
+                ? payment.mpesa_receipt_number
+                : null
+        });
 
-        console.log(
-            `Ask a Friend server running on port ${PORT}`
-        );
+    } catch (error) {
+        console.error("Payment status error:", error);
 
-        console.log(
-            "IntaSend mode:",
-            INTASEND_LIVE
-                ? "LIVE"
-                : "SANDBOX"
-        );
-
-        console.log(
-            "CORS origin:",
-            ALLOWED_ORIGIN
-        );
-
-        console.log(
-            "================================"
-        );
-
+        return res.status(500).json({
+            success: false,
+            message: "Could not check payment status."
+        });
     }
-);
+});
+
+// Start server
+app.listen(PORT, () => {
+    console.log(`GTY Payment API running on port ${PORT}`);
+});
