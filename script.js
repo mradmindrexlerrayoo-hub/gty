@@ -1,67 +1,111 @@
 const API_URL = "https://gty-5vvn.onrender.com";
 
 document.addEventListener("DOMContentLoaded", () => {
-console.log("GTY: JavaScript loaded");
+  console.log("GTY: JavaScript loaded");
 
-```
-const form = document.getElementById("paymentForm");
-const status = document.getElementById("status");
+  const form = document.getElementById("paymentForm");
+  const status = document.getElementById("status");
 
-const firstNameInput = document.getElementById("firstName");
-const phoneInput = document.getElementById("phone");
-const amountInput = document.getElementById("amount");
-const reasonInput = document.getElementById("reason");
+  const firstNameInput = document.getElementById("firstName");
+  const phoneInput = document.getElementById("phone");
+  const amountInput = document.getElementById("amount");
+  const reasonInput = document.getElementById("reason");
 
-const payButton =
+  const payButton =
     document.getElementById("payButton") ||
     document.querySelector(".pay-button") ||
     form?.querySelector('button[type="submit"]');
 
-if (!form) {
+  if (!form) {
     console.error("Payment form not found.");
     return;
-}
+  }
 
-function setStatus(message, type = "info") {
+  function setStatus(message, type = "info") {
     console.log("[STATUS]", message);
 
     if (!status) return;
 
     status.textContent = message;
-
-    status.classList.remove(
-        "error",
-        "success",
-        "loading"
-    );
+    status.classList.remove("error", "success", "loading");
 
     if (type === "error") status.classList.add("error");
     if (type === "success") status.classList.add("success");
     if (type === "loading") status.classList.add("loading");
-}
+  }
 
-// Quick amount buttons
-document.querySelectorAll("[data-amount]").forEach(button => {
+  document.querySelectorAll("[data-amount]").forEach((button) => {
     button.addEventListener("click", () => {
-        const selectedAmount = button.getAttribute("data-amount");
+      const selectedAmount = button.getAttribute("data-amount");
 
-        if (!amountInput) return;
+      if (!amountInput) return;
 
-        amountInput.value = selectedAmount;
+      amountInput.value = selectedAmount;
 
-        document.querySelectorAll("[data-amount]").forEach(btn => {
-            btn.classList.remove("selected");
-        });
+      document.querySelectorAll("[data-amount]").forEach((btn) => {
+        btn.classList.remove("selected");
+      });
 
-        button.classList.add("selected");
+      button.classList.add("selected");
 
-        setStatus(
-            `Amount selected: KSh ${Number(selectedAmount).toLocaleString()}`,
-            "success"
-        );
+      setStatus(
+        `Amount selected: KSh ${Number(selectedAmount).toLocaleString()}`,
+        "success"
+      );
     });
-});
+  });
 
-// Check payment status until completed or timeout
-async function monitorPayment(reference) {
-```
+  async function monitorPayment(reference) {
+    console.log("Monitoring payment:", reference);
+    return reference;
+  }
+
+  form.addEventListener("submit", async (event) => {
+    event.preventDefault();
+
+    if (!firstNameInput || !phoneInput || !amountInput || !reasonInput) {
+      setStatus("Form is missing required fields.", "error");
+      return;
+    }
+
+    const firstName = firstNameInput.value.trim();
+    const phone = phoneInput.value.trim();
+    const amount = Number(amountInput.value);
+    const reason = reasonInput.value.trim();
+
+    if (!firstName || !phone || !reason || !Number.isFinite(amount) || amount < 10) {
+      setStatus("Please complete all fields with a valid amount.", "error");
+      return;
+    }
+
+    setStatus("Sending payment request...", "loading");
+
+    try {
+      const response = await fetch(`${API_URL}/api/payment`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ firstName, phone, amount, reason })
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.message || "Payment request failed.");
+      }
+
+      setStatus(
+        `Payment request sent successfully. Reference: ${data.reference || "N/A"}`,
+        "success"
+      );
+      form.reset();
+    } catch (error) {
+      setStatus(error.message || "Something went wrong.", "error");
+    }
+  });
+
+  if (payButton) {
+    payButton.addEventListener("click", () => {
+      setStatus("Processing payment request...", "loading");
+    });
+  }
+});
