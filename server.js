@@ -242,7 +242,12 @@ async function getAccessToken() {
   const data = await safeJson(response);
 
   if (!response.ok || !data.access_token) {
-    console.error("Daraja OAuth error:", data);
+    console.error("Daraja OAuth error:", {
+      url: `${DARAJA_BASE_URL}/oauth/v1/generate?grant_type=client_credentials`,
+      status: response.status,
+      statusText: response.statusText,
+      response: data
+    });
     throw new Error("Could not authenticate with M-Pesa.");
   }
 
@@ -290,7 +295,12 @@ async function initiateSTKPush(phone, amount, reference) {
   const data = await safeJson(response);
 
   if (!response.ok || data.ResponseCode !== "0") {
-    console.error("STK Push error:", data);
+    console.error("STK Push error:", {
+      status: response.status,
+      statusText: response.statusText,
+      response: data,
+      payload
+    });
     throw new Error(
       data.errorMessage ||
       data.ResponseDescription ||
