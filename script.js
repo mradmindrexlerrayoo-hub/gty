@@ -34,6 +34,21 @@ document.addEventListener("DOMContentLoaded", () => {
     if (type === "loading") status.classList.add("loading");
   }
 
+  async function readJsonResponse(response) {
+    const text = await response.text();
+
+    if (!text) {
+      return {};
+    }
+
+    try {
+      return JSON.parse(text);
+    } catch (error) {
+      console.error("Invalid JSON from server:", text);
+      throw new Error("The server returned an invalid response.");
+    }
+  }
+
   document.querySelectorAll("[data-amount]").forEach((button) => {
     button.addEventListener("click", () => {
       const selectedAmount = button.getAttribute("data-amount");
@@ -87,7 +102,7 @@ document.addEventListener("DOMContentLoaded", () => {
         body: JSON.stringify({ firstName, phone, amount, reason })
       });
 
-      const data = await response.json();
+      const data = await readJsonResponse(response);
 
       if (!response.ok) {
         throw new Error(data.message || "Payment request failed.");
@@ -97,8 +112,10 @@ document.addEventListener("DOMContentLoaded", () => {
         `Payment request sent successfully. Reference: ${data.reference || "N/A"}`,
         "success"
       );
+
       form.reset();
     } catch (error) {
+      console.error("Payment request error:", error);
       setStatus(error.message || "Something went wrong.", "error");
     }
   });
