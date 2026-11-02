@@ -23,8 +23,7 @@ const {
     SUPABASE_SERVICE_ROLE_KEY
 } = process.env;
 
-const DARAJA_BASE_URL = "https://sandbox.safaricom.co.ke";
-
+const DARAJA_BASE_URL = "https://api.safaricom.co.ke";
 const SUPABASE_TABLE_URL =
     `${SUPABASE_URL.replace(/\/$/, "")}/rest/v1/payments`;
 
