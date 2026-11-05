@@ -11,11 +11,6 @@ document.addEventListener("DOMContentLoaded", () => {
   const amountInput = document.getElementById("amount");
   const reasonInput = document.getElementById("reason");
 
-  const payButton =
-    document.getElementById("payButton") ||
-    document.querySelector(".pay-button") ||
-    form?.querySelector('button[type="submit"]');
-
   if (!form) {
     console.error("Payment form not found.");
     return;
@@ -70,11 +65,6 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   });
 
-  async function monitorPayment(reference) {
-    console.log("Monitoring payment:", reference);
-    return reference;
-  }
-
   form.addEventListener("submit", async (event) => {
     event.preventDefault();
 
@@ -114,15 +104,12 @@ document.addEventListener("DOMContentLoaded", () => {
       );
 
       form.reset();
+      document.querySelectorAll("[data-amount]").forEach((button) => {
+        button.classList.remove("selected");
+      });
     } catch (error) {
       console.error("Payment request error:", error);
       setStatus(error.message || "Something went wrong.", "error");
     }
   });
-
-  if (payButton) {
-    payButton.addEventListener("click", () => {
-      setStatus("Processing payment request...", "loading");
-    });
-  }
 });
