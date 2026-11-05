@@ -270,7 +270,7 @@ async function initiateSTKPush(phone, amount, reference) {
     BusinessShortCode: DARAJA_SHORTCODE,
     Password: generatePassword(timestamp),
     Timestamp: timestamp,
-    TransactionType: "CustomerPayBillOnline",
+    TransactionType: "CustomerBuyGoodsOnline",
     Amount: Math.round(amount),
     PartyA: phone,
     PartyB: DARAJA_SHORTCODE,
